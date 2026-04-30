@@ -7,18 +7,41 @@ import com.walletpet.dto.dailyreward.DailyRewardResponse;
 
 public interface DailyRewardService {
 
-    /**
-     * 交易新增、修改、刪除後，重新計算某使用者某一天的每日記帳獎勵。
+    /*
+     * TransactionService 新增 / 修改 / 刪除交易後呼叫。
+     *
+     * 主要責任：
+     * 1. 計算指定日期的收入 / 支出交易筆數
+     * 2. 更新 daily_record_rewards
+     * 3. 若符合條件且未達每日 cancan +5 上限，增加 pets.cancan
+     * 4. 寫入 pet_events
      */
-    DailyRewardResponse handleDailyReward(String currentUserId,LocalDate rewardDate);
+    DailyRewardResponse handleDailyReward(
+            String currentUserId,
+            LocalDate rewardDate
+    );
 
-    /**
-     * 查詢某一天的每日獎勵。
+    /*
+     * 手動重新計算指定日期。
+     * 可供 Controller 測試用。
      */
-    DailyRewardResponse getRewardByDate(String currentUserId,LocalDate rewardDate);
+    DailyRewardResponse calculateDailyReward(
+            String currentUserId,
+            LocalDate rewardDate
+    );
 
-    /**
-     * 查詢最近 30 筆每日獎勵紀錄。
+    /*
+     * 查詢今日或指定日期的每日記帳獎勵狀態。
      */
-    List<DailyRewardResponse> getHistory(String currentUserId);
+    DailyRewardResponse getTodayReward(
+            String currentUserId,
+            LocalDate rewardDate
+    );
+
+    /*
+     * 查詢每日記帳獎勵歷史。
+     */
+    List<DailyRewardResponse> getRewardHistory(
+            String currentUserId
+    );
 }

@@ -47,6 +47,51 @@
   }
   .btn.danger:hover{background:#ffe5e5}
 
+  /*罐罐+1通知*/
+  .reward-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    transform: translateX(-50%) translateY(12px);
+    z-index: 9999;
+
+    padding: 10px 18px;
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    background: #fff7df;
+    box-shadow: 4px 4px 0 var(--ink);
+
+    font-family: 'Kalam', 'Noto Sans TC', sans-serif;
+    font-size: 16px;
+    color: var(--ink);
+
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .reward-toast.show {
+    animation: rewardToastFade 2.2s ease forwards;
+  }
+
+  @keyframes rewardToastFade {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(12px);
+    }
+    15% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    70% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-8px);
+    }
+  }
+
   @media (max-width: 899px){
     .tx-list-host col.c-date    { width: 52px; }
     .tx-list-host col.c-note    { width: 90px; }  /* note 手機更小 */
@@ -124,6 +169,7 @@
           <button type="button" class="btn" id="cancelBtn" style="flex:1;justify-content:center">Clear</button>
           <button type="submit" class="btn primary" id="saveBtn" style="flex:1;justify-content:center">Save EXPENSE</button>
         </div>
+        <div id="rewardToast" class="reward-toast" hidden>記一筆帳，罐罐+1</div>
       </form>
     </section>
 
@@ -318,10 +364,12 @@ function renderList() {
 
 /* ---- EXPENSE / INCOME 切換 ---- */
 document.querySelectorAll('.seg-btn').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.seg-btn').forEach(x => x.classList.toggle('active', x === b));
+  b.addEventListener('click', async () => {
+    document.querySelectorAll('.seg-btn').forEach(x =>
+      x.classList.toggle('active', x === b)
+    );
     state.type = b.dataset.type;
-    populateCategories();
+    await loadFormMeta();//init的方法
     document.getElementById('saveBtn').textContent = 'Save ' + state.type;
     document.getElementById('accountLabel').textContent =
       state.type === 'EXPENSE' ? 'accountId (from)' : 'accountId (to)';
@@ -378,82 +426,178 @@ document.getElementById('txBody').addEventListener('click', e => {
 /* Delete */
 document.getElementById('txDeleteBtn').addEventListener('click', async () => {
   if (!state.editingTxId) return;
-  const t = state.transactions.find(x => x.transactionId === state.editingTxId);
+  const deletingId = state.editingTxId;
+  const t = state.transactions.find(x => String(x.transactionId) === String(deletingId));
   if (!t) return;
-  const label = (t.note || (lookupCategory(t.categoryId)?.categoryName) || t.transactionId);
-  if (!confirm(`確認刪除交易「${label}」(${fmt.date(t.transactionDate)})? 此操作無法復原。`)) return;
-  try {
-    await WalletPet.transactionApi.remove(state.editingTxId);
-  } catch (ex) {
-    console.warn('[transactions] 刪除失敗, 本地模擬');
+  const label = t.note || lookupCategory(t.categoryId)?.categoryName || t.transactionId;
+  if (!confirm(`確認刪除交易「${label}」(${fmt.date(t.transactionDate)})? 此操作無法復原。`)) {
+    return;
   }
-  state.transactions = state.transactions.filter(x => x.transactionId !== state.editingTxId);
-  resetTxForm();
+  try {
+    await WalletPet.transactionApi.remove(deletingId);
+    await refreshAfterTransaction(t.transactionDate);
+    resetTxForm();
+  } catch (ex) {
+    alert(ex.message || '刪除交易失敗');
+  }
 });
 
 /* ---- 表單送出 (new or edit) ---- */
-document.getElementById('txForm').addEventListener('submit', async (e) => {
+document.getElementById('txForm').addEventListener('submit', async function (e) {
   e.preventDefault();
+
   const body = {
-    accountId:         Number(document.getElementById('accountSelect').value),
-    categoryId:        document.getElementById('categorySelect').value,
+    transactionType: state.type,
+    accountId: Number(document.getElementById('accountSelect').value),
+    categoryId: document.getElementById('categorySelect').value,
     transactionAmount: Number(document.getElementById('txAmount').value),
-    transactionType:   state.type,
-    transactionDate:   document.getElementById('txDate').value,
-    note:               document.getElementById('txNote').value || null,
+    transactionDate: document.getElementById('txDate').value,
+    note: document.getElementById('txNote').value.trim(),
   };
-  if (!body.transactionAmount || body.transactionAmount <= 0) {
-    alert('金額必須大於 0');
+
+  if (!body.accountId || !body.categoryId || !body.transactionAmount || !body.transactionDate) {
+    alert('請完整填寫金額、日期、分類與帳戶');
     return;
   }
 
   if (state.editingTxId) {
-    // UPDATE
     try {
-      const updated = await WalletPet.transactionApi.update(state.editingTxId, body);
-      const idx = state.transactions.findIndex(x => x.transactionId === state.editingTxId);
-      if (idx >= 0) state.transactions[idx] = updated || { ...state.transactions[idx], ...body };
+      await WalletPet.transactionApi.update(state.editingTxId, body);
+      await refreshAfterTransaction(body.transactionDate);
+      resetTxForm();
     } catch (ex) {
-      console.warn('[transactions] 更新失敗, 本地模擬');
-      const idx = state.transactions.findIndex(x => x.transactionId === state.editingTxId);
-      if (idx >= 0) state.transactions[idx] = { ...state.transactions[idx], ...body };
+      alert(ex.message || '修改交易失敗');
     }
-  } else {
-    // CREATE
-    let created = null;
-    try {
-      created = await WalletPet.transactionApi.create(body);
-      state.transactions.unshift(created);
-    } catch (ex) {
-      console.warn('[transactions] 新增失敗, 本地模擬');
-      created = { transactionId: 't_local_' + Date.now(), ...body };
-      state.transactions.unshift(created);
-    }
-
-    /* cancan 系統 hook:每筆記帳成功後請後端發 +1 cancan(每日上限 +5)
-       後端尚未實作 4 組 TransactionService 之前,先在前端接;
-       未來 4 組把這段移到 TransactionServiceImpl#create 內呼叫 petService.claimBookkeepingReward
-       後,可把這段刪掉。 */
-    try {
-      const userId = localStorage.getItem('walletpet.userId');
-      const petId  = localStorage.getItem('walletpet.petId');
-      if (userId && petId) {
-        const updatedPet = await WalletPet.petApi.claimBookkeeping({
-          userId,
-          petId,
-          transactionId: created && created.transactionId ? String(created.transactionId) : null,
-        });
-        if (updatedPet) WalletPet.updatePetStatus(updatedPet);
-      } else {
-        console.info('[transactions] 沒有 userId / petId 快取,跳過 cancan 獎勵');
-      }
-    } catch (ex) {
-      // 後端未啟動 / 端點未實作 — 不影響交易主流程
-      console.warn('[transactions] cancan 獎勵呼叫失敗', ex);
-    }
+    return;
   }
+
+  // CREATE
+  const rewardDate = body.transactionDate;
+  // 1. 新增交易前，先查今天已發多少 cancan
+  let beforeReward = null;
+  try {
+    beforeReward = await WalletPet.dailyRewardApi.today(rewardDate);
+  } catch (e) {
+    beforeReward = { cancanDelta: 0 };
+  }
+  // 2. 新增交易
+  try {
+    await WalletPet.transactionApi.create(body);
+  } catch (ex) {
+    alert(ex.message || '新增交易失敗');
+    return;
+  }
+  // 3. 新增交易後，再查一次今天已發多少 cancan
+  let afterReward = null;
+  try {
+    afterReward = await WalletPet.dailyRewardApi.today(rewardDate);
+  } catch (e) {
+    afterReward = beforeReward;
+  }
+  // 4. 判斷這次新增交易有沒有真的拿到罐罐
+  const beforeCancanDelta = Number(beforeReward?.cancanDelta || 0);
+  const afterCancanDelta = Number(afterReward?.cancanDelta || 0);
+  const gained = afterCancanDelta - beforeCancanDelta;
+
+  if (gained > 0) {
+    showRewardToast(
+      gained === 1
+        ? '記一筆帳，罐罐+1'
+        : `記一筆帳，罐罐+${gained}`
+    );
+  }
+  // 5. 重新載入交易、表單選項、每日獎勵、寵物狀態、寵物事件
+  await refreshAfterTransaction(rewardDate);
   resetTxForm();
 });
+
+//罐罐+1呼叫
+function showRewardToast(text = '記一筆帳，罐罐+1') {
+  const toast = document.getElementById('rewardToast');
+  if (!toast) return;
+
+  toast.textContent = text;
+  toast.hidden = false;
+  toast.classList.remove('show');
+
+  // 強制重啟動畫
+  void toast.offsetWidth;
+
+  toast.classList.add('show');
+
+  window.setTimeout(() => {
+    toast.classList.remove('show');
+    toast.hidden = true;
+  }, 2300);
+}
+
+async function loadFormMeta() {
+  try {
+    const meta = await WalletPet.transactionApi.formMeta(state.type);
+    state.accounts = meta.accounts || [];
+    state.categories = meta.categories || [];
+  } catch (e) {
+    console.warn('[transactions] form-meta 載入失敗，使用 demo 資料', e);
+    state.accounts = demoAccounts;
+    state.categories = demoCategories;
+  }
+
+  populateAccounts();
+  populateCategories();
+}
+
+async function loadTransactions() {
+  try {
+    const data = await WalletPet.transactionApi.list({
+      page: 0,
+      size: 100,
+      type: state.typeFilter || '',
+    });
+
+    state.transactions = data.items || [];
+  } catch (e) {
+    console.warn('[transactions] 交易列表載入失敗，使用 demo 資料', e);
+    state.transactions = demoTransactions;
+  }
+
+  renderList();
+}
+
+async function refreshDailyReward(date) {
+  try {
+    state.dailyReward = await WalletPet.dailyRewardApi.today(date);
+  } catch (e) {
+    console.warn('[transactions] daily reward reload failed', e);
+  }
+}
+
+async function refreshPet() {
+  try {
+    const pet = await WalletPet.petApi.me();
+    WalletPet.updatePetStatus(pet);
+    state.pet = pet;
+  } catch (e) {
+    console.warn('[transactions] pet reload failed', e);
+  }
+}
+
+async function refreshPetEvents() {
+  try {
+    state.petEvents = await WalletPet.petEventApi.list({ page: 0, size: 10 });
+  } catch (e) {
+    console.warn('[transactions] pet events reload failed', e);
+  }
+}
+
+async function refreshAfterTransaction(date) {
+  await Promise.allSettled([
+    loadTransactions(),
+    loadFormMeta(),
+    refreshDailyReward(date),
+    refreshPet(),
+    refreshPetEvents(),
+  ]);
+}
 
 document.getElementById('cancelBtn').addEventListener('click', resetTxForm);
 
@@ -468,19 +612,13 @@ document.getElementById('typeFilter').addEventListener('change', e => {
 async function init() {
   document.getElementById('txDate').value = fmt.today();
 
-  try { state.categories = await WalletPet.categoryApi.list(); }
-  catch { state.categories = demoCategories; }
-
-  try { state.accounts = await WalletPet.accountApi.list(); }
-  catch { state.accounts = demoAccounts; }
-
-  try { state.transactions = await WalletPet.transactionApi.list(); }
-  catch { state.transactions = demoTransactions; }
-
-  populateCategories();
-  populateAccounts();
-  renderList();
+  await loadFormMeta();
+  await loadTransactions();
+  await refreshPet();
+  await refreshPetEvents();
+  await refreshDailyReward(fmt.today());
 }
+
 init();
 </script>
 </body>

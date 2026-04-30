@@ -814,21 +814,35 @@ document.getElementById('catCancelBtn').addEventListener('click', resetCatForm);
 /* Delete */
 document.getElementById('catDeleteBtn').addEventListener('click', async () => {
   if (!state.editingCategoryId) return;
-  const c = state.categories.find(x => x.categoryId === state.editingCategoryId);
-  if (!c) return;
-  if (c.isSystem) {
-    alert('系統預設分類無法刪除。');
+  const category = state.categories.find(
+    x => String(x.categoryId) === String(state.editingCategoryId)
+  );
+  const label = category?.categoryName || state.editingCategoryId;
+  if (!confirm(`確認停用分類「${label}」？停用後不會出現在新增交易選項中。`)) {
     return;
   }
-  if (!confirm(`確認刪除分類「${c.icon || ''} ${c.categoryName}」? 此操作無法復原。`)) return;
   try {
-    await WalletPet.categoryApi.remove(state.editingCategoryId);
+    await WalletPet.categoryApi.disable(state.editingCategoryId);
+    // 重新向後端查詢，最穩
+    await loadCategories();
+    resetCategoryForm();
   } catch (ex) {
-    console.warn('[categories] 刪除失敗, 本地模擬');
+    alert(ex.message || '停用分類失敗');
   }
-  state.categories = state.categories.filter(x => x.categoryId !== state.editingCategoryId);
-  resetCatForm();
 });
+
+async function loadCategories() {
+  try {
+    state.categories = await WalletPet.categoryApi.list({
+      type: state.type,
+      includeDisabled: true,
+    });
+  } catch (e) {
+    console.warn('[categories] 分類載入失敗', e);
+    state.categories = [];
+  }
+  renderCategories();
+}
 
 /* Submit: create or update */
 document.getElementById('catForm').addEventListener('submit', async (e) => {

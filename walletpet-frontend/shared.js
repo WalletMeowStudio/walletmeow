@@ -99,34 +99,55 @@ WalletPet.constants = {
    - 回傳格式: ApiResponse<T> = { success, message, data }
    ========================================================= */
 WalletPet.api = (function(){
-  const BASE_URL = 'http://localhost:8080';
+  const BASE_URL = 'http://localhost:8080/walletpet';
   const TOKEN_KEY = 'walletpet.jwt';
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
   function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
   function clearToken() { localStorage.removeItem(TOKEN_KEY); }
 
-  async function request(method, path, body) {
-    const headers = { 'Content-Type': 'application/json' };
+  function qs(params) {
+    if (!params) return '';
+    const u = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') u.append(k, v);
+    });
+    const s = u.toString();
+    return s ? '?' + s : '';
+  }
+
+  async function request(method, path, body, options = {}) {
+    const headers = {};
     const token = getToken();
     if (token) headers['Authorization'] = 'Bearer ' + token;
+
+    let finalBody;
+
+    if (options.form) {
+      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      finalBody = new URLSearchParams(body).toString();
+    } else if (body) {
+      headers['Content-Type'] = 'application/json';
+      finalBody = JSON.stringify(body);
+    }
 
     const res = await fetch(BASE_URL + path, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: finalBody,
     });
 
-    // 若後端未啟動,給出明確錯誤 (而不是 fetch 的原生錯誤)
-    if (!res.ok && res.status === 0) {
-      throw new Error('無法連接後端 ' + BASE_URL + ' · 請確認 Spring Boot 已啟動');
+    const json = await res.json().catch(() => ({}));
+
+    if (res.status === 401) {
+      WalletPet.logout();
+      throw new Error('登入逾時，請重新登入');
     }
 
-    const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      const msg = json.message || res.statusText || 'Request failed';
-      throw new Error(msg);
+      throw new Error(json.message || res.statusText || 'Request failed');
     }
+
     return json.data;
   }
 
@@ -138,6 +159,9 @@ WalletPet.api = (function(){
     post: (path, body) => request('POST',   path, body),
     put:  (path, body) => request('PUT',    path, body),
     del:  (path)       => request('DELETE', path),
+    postForm: (path, body) => request('POST', path, body, { form: true }),
+    putForm:  (path, body) => request('PUT', path, body, { form: true }),
+    qs,
   };
 })();
 
@@ -554,17 +578,12 @@ WalletPet.updateCancan = function(newCancan) {
   if (cc) cc.textContent = `🥫 cancan ${newCancan}`;
 };
 
-/** 一次套用 PetResponse 的 mood + cancan,並寫回 localStorage / header chip
- *  另外把 petId / userId 也寫進 localStorage,讓其他頁(如 transactions)能直接拿來呼叫
- *  /api/pets/claim-bookkeeping 等需要 petId 的端點。 */
+/** 一次套用 PetResponse 的 mood + cancan，並寫回 localStorage / header chip。 */
 WalletPet.updatePetStatus = function(pet) {
   if (!pet || typeof pet !== 'object') return;
-  if (typeof pet.mood   === 'number') WalletPet.updateMood(pet.mood);
+  if (typeof pet.mood === 'number') WalletPet.updateMood(pet.mood);
   if (typeof pet.cancan === 'number') WalletPet.updateCancan(pet.cancan);
-  if (pet.petId)  localStorage.setItem('walletpet.petId',  String(pet.petId));
-  if (pet.userId) localStorage.setItem('walletpet.userId', String(pet.userId));
 };
-
 
 /* =========================================================
    9. AUTO-INIT on DOMContentLoaded
@@ -581,18 +600,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // - pets 頁自己會 loadPet,這裡當作備援
   const mc = document.getElementById('moodChip');
   if (mc && WalletPet.petApi && typeof WalletPet.petApi.me === 'function') {
-    WalletPet.petApi.me()
-      .then(p => {
-        WalletPet.updatePetStatus(p);
-      })
-      .catch(() => {
-        // 後端未連通或未登入 — 若連快取都沒有,給 demo 預設值
-        const cachedM = localStorage.getItem('walletpet.mood');
-        if (cachedM === null || cachedM === '') WalletPet.updateMood(60);    // demo: 預設 mood 60
-        const cachedC = localStorage.getItem('walletpet.cancan');
-        if (cachedC === null || cachedC === '') WalletPet.updateCancan(0);   // demo: 預設 cancan 0
-      });
-  }
+  WalletPet.petApi.me()
+    .then(p => {
+      WalletPet.updatePetStatus(p);
+    })
+    .catch((e) => {
+      console.warn('[shared] pet status refresh failed', e);
+    });
+}
 });
 
 window.WalletPet = WalletPet;

@@ -8,13 +8,10 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.walletpet.enums.RewardType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -52,15 +49,17 @@ public class DailyRecordReward {
 	@Column(name = "streak_days", nullable = false)
 	private Integer streakDays = 0;
 
-	@Enumerated(EnumType.STRING)
 	@Column(name = "reward_type", length = 50)
-	private RewardType rewardType;
+	private String rewardType;
 
 	@Column(name = "reward_value")
 	private Integer rewardValue;
 
 	@Column(name = "mood_delta", nullable = false)
 	private Integer moodDelta = 0;
+	
+	@Column(name = "cancan_delta", nullable = false)
+	private Integer cancanDelta = 0;
 
 	@Column(name = "claimed_at")
 	private LocalDateTime claimedAt;

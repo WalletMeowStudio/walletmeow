@@ -45,10 +45,10 @@ public class Pet {
     private String petName;
 
     @Column(name = "mood", nullable = false)
-    private Integer mood;
+    private Integer mood=60;
 
     @Column(name = "cancan", nullable = false)
-    private Integer cancan;
+    private Integer cancan=0;
 
     @Column(name = "last_update_at", nullable = false, insertable = false)
     @LastModifiedDate
@@ -61,7 +61,4 @@ public class Pet {
     @CreatedDate
     private LocalDateTime createdAt;
 
-    @JsonIgnore
-    @OneToMany(mappedBy = "pet", fetch = FetchType.LAZY)
-    private Set<PetEvent> events;
 }

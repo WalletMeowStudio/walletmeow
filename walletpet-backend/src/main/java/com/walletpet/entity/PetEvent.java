@@ -30,11 +30,7 @@ public class PetEvent {
 
     @Column(name = "mood_delta")
     private Integer moodDelta;
-<<<<<<< HEAD
-
-=======
     
->>>>>>> tzuchen
     @Column(name = "cancan_delta", nullable = false)
     private Integer cancanDelta;
 

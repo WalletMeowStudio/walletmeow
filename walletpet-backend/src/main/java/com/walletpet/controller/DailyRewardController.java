@@ -26,21 +26,26 @@ public class DailyRewardController {
 
     private final CurrentUserUtil currentUserUtil;
 
-    /**
-     * 手動重新計算某一天的每日記帳獎勵。
+    /*
+     * 手動重新計算指定日期每日記帳獎勵。
      *
-     * 測試用：
-     * POST http://localhost:8080/walletpet/api/rewards/daily/calculate?date=2026-04-25
+     * 主要供測試或交易異常後重算使用。
+     *
+     * POST /walletpet/api/rewards/daily/calculate?date=2026-04-29
+     *
+     * 注意：
+     * 正式交易流程會由 TransactionService 自動呼叫 DailyRewardService。
+     * 這支 API 不是主要發獎入口。
      */
     @PostMapping("/calculate")
-    public ApiResponse<DailyRewardResponse> calculateReward(
-            @RequestParam
+    public ApiResponse<DailyRewardResponse> calculateDailyReward(
+            @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate date
     ) {
         String currentUserId = currentUserUtil.getCurrentUserId();
 
-        DailyRewardResponse data = dailyRewardService.handleDailyReward(
+        DailyRewardResponse data = dailyRewardService.calculateDailyReward(
                 currentUserId,
                 date
         );
@@ -48,20 +53,21 @@ public class DailyRewardController {
         return ApiResponse.success("每日記帳獎勵計算成功", data);
     }
 
-    /**
-     * 查詢指定日期的每日獎勵。
+    /*
+     * 查詢今日或指定日期每日記帳獎勵狀態。
      *
-     * GET http://localhost:8080/walletpet/api/rewards/daily/today?date=2026-04-25
+     * GET /walletpet/api/rewards/daily/today
+     * GET /walletpet/api/rewards/daily/today?date=2026-04-29
      */
     @GetMapping("/today")
     public ApiResponse<DailyRewardResponse> getTodayReward(
-            @RequestParam
+            @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate date
     ) {
         String currentUserId = currentUserUtil.getCurrentUserId();
 
-        DailyRewardResponse data = dailyRewardService.getRewardByDate(
+        DailyRewardResponse data = dailyRewardService.getTodayReward(
                 currentUserId,
                 date
         );
@@ -69,16 +75,16 @@ public class DailyRewardController {
         return ApiResponse.success("查詢成功", data);
     }
 
-    /**
-     * 查詢最近 30 筆每日獎勵紀錄。
+    /*
+     * 查詢目前登入者的每日記帳獎勵歷史。
      *
-     * GET http://localhost:8080/walletpet/api/rewards/daily/history
+     * GET /walletpet/api/rewards/daily/history
      */
     @GetMapping("/history")
-    public ApiResponse<List<DailyRewardResponse>> getHistory() {
+    public ApiResponse<List<DailyRewardResponse>> getRewardHistory() {
         String currentUserId = currentUserUtil.getCurrentUserId();
 
-        List<DailyRewardResponse> data = dailyRewardService.getHistory(
+        List<DailyRewardResponse> data = dailyRewardService.getRewardHistory(
                 currentUserId
         );
 

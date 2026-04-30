@@ -20,10 +20,6 @@ public class PetMapper {
         response.setPetName(pet.getPetName());
         response.setMood(pet.getMood());
         response.setCancan(pet.getCancan());
-<<<<<<< HEAD
-        response.setLastUpdateAt(pet.getLastUpdateAt());
-=======
->>>>>>> tzuchen
         response.setIsDisplayed(pet.getIsDisplayed());
         response.setLastUpdateAt(pet.getLastUpdateAt());
 

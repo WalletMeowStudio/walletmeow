@@ -1,20 +1,22 @@
 package com.walletpet.repository;
 
 import com.walletpet.entity.PetEvent;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.List;
 
 public interface PetEventRepository extends JpaRepository<PetEvent, Long> {
 
-    List<PetEvent> findByUser_UserIdOrderByCreatedAtDesc(String userId);
-
-    List<PetEvent> findByPet_PetIdOrderByCreatedAtDesc(String petId);
-
+	Page<PetEvent> findByUser_UserIdOrderByCreatedAtDesc(
+            String userId,
+            Pageable pageable
+    );
     /**
      * 加總指定使用者在一段時間區間內、特定 event_type 集合的 mood_delta。
      * 用於每日 +3 mood 上限稽核（FEED_CAN / FEED_FISH / FEED_SNACK 合計）。
@@ -55,8 +57,4 @@ public interface PetEventRepository extends JpaRepository<PetEvent, Long> {
             @Param("startInclusive") LocalDateTime startInclusive,
             @Param("endExclusive") LocalDateTime endExclusive
     );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> tzuchen
