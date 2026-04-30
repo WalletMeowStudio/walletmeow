@@ -62,15 +62,25 @@
 
   /* ---------- Transaction (第 4 組) ---------- */
   WalletPet.transactionApi = {
-    formMeta: (transactionType = '') =>
-      api.get('/api/transactions/form-meta' + api.qs({ transactionType })),
-    list: (params = {}) =>api.get('/api/transactions' + api.qs(params)),
-    summary: (params = {}) =>api.get('/api/transactions/summary' + api.qs(params)),
-    get: (id) =>api.get(`/api/transactions/${id}`),
-    create: (body) =>api.post('/api/transactions', body),
-    update: (id, body) =>api.put(`/api/transactions/${id}`, body),
-    remove: (id) =>api.del(`/api/transactions/${id}`),
-  };
+  formMeta: (transactionType = '') =>
+    api.get('/api/transactions/form-meta' + api.qs({ transactionType })),
+
+  list: (params = {}) =>
+    api.get('/api/transactions' + api.qs({
+      startDate: params.startDate,
+      endDate: params.endDate,
+      accountId: params.accountId,
+      categoryId: params.categoryId,
+      type: params.type,
+      page: params.page,
+      size: params.size,
+    })),
+  summary: (params = {}) => api.get('/api/transactions/summary' + api.qs(params)),
+  get: (id) => api.get(`/api/transactions/${id}`),
+  create: (body) => api.post('/api/transactions', body),
+  update: (id, body) => api.put(`/api/transactions/${id}`, body),
+  remove: (id) => api.del(`/api/transactions/${id}`),
+};
 
   /* ---------- Budget (第 5 組 俊廷) ---------- */
   WalletPet.budgetApi = {
