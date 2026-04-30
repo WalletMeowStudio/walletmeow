@@ -3,6 +3,7 @@ package com.walletpet.controller;
 import java.time.LocalDate;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,7 +18,7 @@ import com.walletpet.service.LoginStreakService;
 import com.walletpet.service.PetService;
 
 import lombok.RequiredArgsConstructor;
-
+@CrossOrigin(origins = "http://127.0.0.1:5500", allowedHeaders = "*", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/pets")
 @RequiredArgsConstructor

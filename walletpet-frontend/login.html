@@ -9,16 +9,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&family=Gloria+Hallelujah&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./shared.css">
 <style>
-  /* === login-specific layout (landscape-first, two-panel) === */
+  /* === 登入頁面佈局 === */
   .login-wrap{
     display:grid;grid-template-columns: 1.1fr .9fr;gap:20px;align-items:stretch;
     flex:1;min-height:0;
   }
   .login-hero{
     border:2.5px solid var(--ink);border-radius:16px;
-    background:
-      radial-gradient(circle at 80% 20%, var(--accent-soft) 0%, transparent 55%),
-      var(--paper);
+    background: radial-gradient(circle at 80% 20%, var(--accent-soft) 0%, transparent 55%), var(--paper);
     padding:28px;position:relative;overflow:hidden;
     box-shadow:4px 4px 0 var(--ink);
     display:flex;flex-direction:column;
@@ -38,32 +36,44 @@
   .sign-card .welcome p{font-family:'Kalam';color:var(--muted);font-size:15px;margin:6px 0 0}
   .sign-card .field-stack{display:flex;flex-direction:column;gap:14px;flex:1;justify-content:center}
   .sign-card .input.lg{font-size:18px;padding:12px 14px}
-  .foot-card{padding:14px 16px}
-  #loginError{
+  
+  #loginError, #registerError {
     color:var(--rose);font-family:'Kalam';font-size:13px;min-height:18px;
     border:1.5px dashed var(--rose);border-radius:6px;padding:4px 8px;
     display:none;
   }
-  #loginError.show{display:block}
+  #loginError.show, #registerError.show {display:block}
+
+  /* === 註冊彈窗 (Modal) 專屬樣式 === */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(5px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000;
+  }
+  .modal-content {
+    width: 90%; max-width: 450px; height: auto !important;
+    background: var(--paper) !important;
+    box-shadow: 8px 8px 0 var(--ink) !important;
+    border: 2.5px solid var(--ink); border-radius: 16px;
+    animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  @keyframes modalPop {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .btn-close {
+    background: none; border: none; font-size: 36px; 
+    cursor: pointer; font-family: 'Kalam'; color: var(--ink-soft);
+  }
 
   @media (max-width: 899px){
-    .login-wrap{grid-template-columns: 1fr 1fr;gap:10px;min-height:calc(100vh - 66px)}
-    .login-hero{padding:14px;min-height:unset}
-    .login-hero h1{font-size:36px;margin:4px 0}
-    .login-hero .floaty{width:140px;font-size:14px}
-    .sign-card{padding:12px;gap:10px}
-    .sign-card .welcome h2{font-size:26px}
-    .sign-card .welcome p{font-size:12px;margin:2px 0 0}
-    .sign-card .field-stack{gap:8px}
-    .sign-card .input.lg{font-size:14px;padding:6px 10px}
-    label.field{margin-bottom:4px}
-    label.field span{font-size:14px}
-    .foot-card{padding:6px 10px;font-size:11px}
+    .login-wrap{grid-template-columns: 1fr; gap:10px;}
+    .login-hero{display:none}
   }
 </style>
 </head>
 <body>
-
 
 <main>
   <form id="loginForm" class="login-wrap" autocomplete="on" novalidate>
@@ -120,51 +130,133 @@
   </form>
 </main>
 
-<div data-wp-tweaks></div>
+<!-- 註冊彈窗 (Modal) -->
+<div id="registerModal" class="modal-overlay">
+  <div class="card sign-card modal-content">
+    <div class="row" style="justify-content:space-between; align-items:center; margin-bottom: 10px;">
+      <div class="welcome">
+        <h2>Join WalletPet</h2>
+        <p>Create an account to start tracking!</p>
+      </div>
+      <button type="button" class="btn-close" id="closeModalBtn">×</button>
+    </div>
+
+    <div class="field-stack">
+      <label class="field">
+        <span>User ID (Account)</span>
+        <input class="input lg" id="regUserId" placeholder="choose your ID" />
+      </label>
+      <label class="field">
+        <span>Email</span>
+        <input class="input lg" id="regEmail" type="email" placeholder="mochi@example.com" />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input class="input lg" id="regPassword" type="password" placeholder="••••••••" />
+      </label>
+      <label class="field">
+         <span>Pet Name (取個好聽的名字吧！)</span>
+        <input class="input lg" id="regPetName" placeholder="例如：小肥貓、Mochi..." />
+      </label>
+      <div id="registerError"></div>
+    </div>
+
+    <button type="button" class="btn primary" id="doRegisterBtn" style="width:100%; font-size:20px; margin-top:10px; background-color: var(--accent-soft);">Sign Up Now</button>
+  </div>
+</div>
 
 <script src="./shared.js"></script>
 <script src="./api.js"></script>
 <script>
-/* ==============================================================
-   Login page — 串接 POST /api/auth/login
-   LoginRequest:  { userName, password }
-   LoginResponse: { token, userId, userName, role, mood? }
-   ============================================================== */
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const err = document.getElementById('loginError');
-  err.classList.remove('show'); err.textContent = '';
+document.addEventListener('DOMContentLoaded', () => {
+  const regModal = document.getElementById('registerModal');
+  const loginForm = document.getElementById('loginForm');
+  const createAccountBtn = document.getElementById('createAccountBtn');
+  const closeModalBtn = document.getElementById('closeModalBtn');
 
-  const userName = document.getElementById('userName').value.trim();
-  const password  = document.getElementById('password').value;
+  /* --- 登入邏輯 --- */
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = document.getElementById('loginError');
+    err.classList.remove('show'); err.textContent = '';
 
-  if (!userName || !password) {
-    err.textContent = '請輸入帳號與密碼';
-    err.classList.add('show');
-    return;
-  }
+    const userName = document.getElementById('userName').value.trim();
+    const password  = document.getElementById('password').value;
 
-  try {
-    const data = await WalletPet.authApi.login({ userName, password });
-    if (!data || !data.token) throw new Error('登入回應缺少 token');
+    if (!userName || !password) {
+      err.textContent = '請輸入帳號與密碼';
+      err.classList.add('show');
+      return;
+    }
 
-    WalletPet.api.setToken(data.token);
-    localStorage.setItem('walletpet.user', JSON.stringify({
-      userId:   data.userId,
-      userName: data.userName,
-      role:      data.role,
-      mood:      data.mood,
-    }));
-    location.href = 'dashboard.html';
-  } catch (ex) {
-    err.textContent = ex.message || '登入失敗';
-    err.classList.add('show');
-  }
-});
+    try {
+      const data = await WalletPet.authApi.login({ userName, password });
+      if (!data || !data.token) throw new Error('登入回應缺少 token');
 
-document.getElementById('createAccountBtn').addEventListener('click', () => {
-  // TODO: 第 2 組彥祥決定 register 是獨立頁或 modal
-  alert('註冊功能尚在開發中 · RegisterView.vue');
+      WalletPet.api.setToken(data.token);
+      localStorage.setItem('walletpet.user', JSON.stringify({
+        userId:   data.userId,
+        userName: data.userName,
+        role:      data.role,
+        mood:      data.mood,
+      }));
+      location.href = 'dashboard.html';
+    } catch (ex) {
+      err.textContent = ex.message || '登入失敗';
+      err.classList.add('show');
+    }
+  });
+
+  /* --- 註冊彈窗控制 --- */
+  createAccountBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    regModal.style.display = 'flex';
+  });
+
+  closeModalBtn.addEventListener('click', () => {
+    regModal.style.display = 'none';
+  });
+
+  window.addEventListener('click', (e) => {
+    if (e.target === regModal) regModal.style.display = 'none';
+  });
+
+  /* --- 註冊 API 串接 --- */
+  document.getElementById('doRegisterBtn').addEventListener('click', async () => {
+    const err = document.getElementById('registerError');
+    err.classList.remove('show');
+
+    const userId   = regModal.querySelector('#regUserId').value.trim();
+const email    = regModal.querySelector('#regEmail').value.trim();
+const password = regModal.querySelector('#regPassword').value;
+const petName  = regModal.querySelector('#regPetName').value.trim(); // 確保 ID 是 regPetName
+
+// 2. 檢查是否漏填
+if (!userId || !email || !password || !petName) {
+  err.textContent = '請填寫所有欄位，別忘了給寵物取名！';
+  err.classList.add('show');
+  return;
+}
+
+// 3. 傳送給後端 (注意鑰匙名稱要跟後端 Java 一樣)
+try {
+  await WalletPet.authApi.register({ 
+    userName: userId,  
+    email: email, 
+    password: password,
+    petName: petName   
+  });
+
+  alert(`註冊成功！歡迎 ${userId} 與 ${petName}！`);
+  regModal.style.display = 'none';
+  document.getElementById('userName').value = userId; 
+} catch (ex) {
+  err.textContent = ex.message || '註冊失敗';
+  err.classList.add('show');
+}
+  /* --- 覆蓋到這裡結束 --- */
+
+  });
 });
 </script>
 </body>
