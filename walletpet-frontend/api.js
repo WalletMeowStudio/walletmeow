@@ -11,7 +11,7 @@
   /* ---------- Auth (第 2 組 彥祥) ---------- */
   WalletPet.authApi = {
     login    : (body) => api.post('/api/auth/login', body),
-    register : (body) => api.post('/api/auth/register', body),
+    register : (body) => api.post('/api/users/register', body),
     me       : ()     => api.get('/api/users/me'),
   };
 
@@ -70,8 +70,11 @@
     list   : ()      => api.get('/api/saving-goals'),
     create : (body)  => api.post('/api/saving-goals', body),
     update : (id, b) => api.put(`/api/saving-goals/${id}`, b),
-    remove : (id)    => api.del(`/api/saving-goals/${id}`),
-    deposit: (id, amount) => api.post(`/api/saving-goals/${id}/deposit`, { amount }),
+    remove : (id, toAccountId) => api.del(`/api/saving-goals/${id}?toAccountId=${toAccountId}`),
+    deposit: (id, amount, fromAccountId) => 
+  api.post(`/api/saving-goals/${id}/deposit?amount=${amount}&fromAccountId=${fromAccountId}`),
+    complete: (id) => api.put(`/api/saving-goals/${id}/complete`),
+    getSavingAccounts: () => api.get('/api/accounts/saving-only'),
   };
 
   /* ---------- Pet (第 1 組 禹孜) — 規格 4.5 Pet 模組 + cancan 系統 ----------
