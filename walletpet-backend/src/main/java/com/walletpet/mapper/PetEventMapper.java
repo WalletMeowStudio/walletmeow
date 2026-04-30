@@ -6,30 +6,27 @@ import com.walletpet.entity.PetEvent;
 public class PetEventMapper {
 
     private PetEventMapper() {
+
     }
 
-    public static PetEventResponse toResponse(PetEvent event) {
-        if (event == null) {
+    public static PetEventResponse toResponse(PetEvent petEvent) {
+        if (petEvent == null) {
             return null;
         }
 
         PetEventResponse response = new PetEventResponse();
 
-        response.setPetEventId(event.getPetEventId());
+        response.setPetEventId(petEvent.getPetEventId());
 
-        if (event.getPet() != null) {
-            response.setPetId(event.getPet().getPetId());
-            response.setPetName(event.getPet().getPetName());
+        if (petEvent.getPet() != null) {
+            response.setPetName(petEvent.getPet().getPetName());
         }
 
-        response.setEventType(event.getEventType());
-        response.setMoodDelta(event.getMoodDelta());
-<<<<<<< HEAD
-        response.setCancanDelta(event.getCancanDelta());
-=======
->>>>>>> tzuchen
-        response.setReward(event.getReward());
-        response.setCreatedAt(event.getCreatedAt());
+        response.setEventType(petEvent.getEventType());
+        response.setMoodDelta(petEvent.getMoodDelta());
+        response.setCancanDelta(petEvent.getCancanDelta());
+        response.setReward(petEvent.getReward());
+        response.setCreatedAt(petEvent.getCreatedAt());
 
         return response;
     }

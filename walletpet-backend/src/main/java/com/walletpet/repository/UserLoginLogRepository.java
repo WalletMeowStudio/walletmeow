@@ -1,19 +1,33 @@
 package com.walletpet.repository;
 
-import com.walletpet.entity.UserLoginLog;
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.walletpet.entity.UserLoginLog;
+
 public interface UserLoginLogRepository extends JpaRepository<UserLoginLog, Long> {
 
-    Optional<UserLoginLog> findByUser_UserIdAndLoginDate(String userId, LocalDate loginDate);
+    boolean existsByUser_UserIdAndLoginDate(
+            String userId,
+            LocalDate loginDate
+    );
 
-    /**
-     * 取出指定使用者最近 N 筆登入紀錄，依日期由新到舊排序，
-     * 用於計算連續登入 / 缺席天數。
-     */
-    List<UserLoginLog> findTop14ByUser_UserIdOrderByLoginDateDesc(String userId);
+    Optional<UserLoginLog> findByUser_UserIdAndLoginDate(
+            String userId,
+            LocalDate loginDate
+    );
+
+    Optional<UserLoginLog> findTop1ByUser_UserIdAndLoginDateBeforeOrderByLoginDateDesc(
+            String userId,
+            LocalDate loginDate
+    );
+
+    List<UserLoginLog> findByUser_UserIdAndLoginDateBetweenOrderByLoginDateDesc(
+            String userId,
+            LocalDate startDate,
+            LocalDate endDate
+    );
 }

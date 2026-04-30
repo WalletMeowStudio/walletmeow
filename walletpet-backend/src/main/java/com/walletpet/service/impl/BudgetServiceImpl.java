@@ -3,19 +3,16 @@ package com.walletpet.service.impl;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.walletpet.dto.budget.BudgetResult;
-import com.walletpet.dto.transaction.TransactionSummaryResponse;
 import com.walletpet.entity.Budget;
-import com.walletpet.entity.Transaction;
 import com.walletpet.entity.User;
 import com.walletpet.repository.BudgetRepository;
-import com.walletpet.repository.TransactionRepository;
 import com.walletpet.service.BudgetService;
 import com.walletpet.service.TransactionService;
 import com.walletpet.service.UserService;
@@ -25,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class BudgetServiceImpl implements BudgetService{
+public class BudgetServiceImpl implements BudgetService {
 	
 	private final UserService userService;
 	
@@ -53,7 +50,9 @@ public class BudgetServiceImpl implements BudgetService{
         return budgets.stream().map(budget -> {
             // 2. 直接接他的查總額功能
             // 傳入：用戶ID、預算開始日、結束日、不限帳戶(null)、指定該預算的分類ID
-            TransactionSummaryResponse summary = transactionService.getSummary(
+            // 注意：TransactionService.getSummary() 目前已改成回傳 Map<String, Object>
+            // 原本的 TransactionSummaryResponse 已不再使用
+            Map<String, Object> summary = transactionService.getSummary(
                     userId,
                     budget.getStartDate(),
                     budget.getEndDate(),
@@ -62,7 +61,7 @@ public class BudgetServiceImpl implements BudgetService{
             );
 
             // 3. 從 Summary 直接拿到算好的總支出
-            BigDecimal totalSpent = summary.getTotalExpense();
+            BigDecimal totalSpent = getBigDecimal(summary, "totalExpense");
 
             BudgetResult result = new BudgetResult();
             result.setBudget(budget);
@@ -109,5 +108,27 @@ public class BudgetServiceImpl implements BudgetService{
     public void deleteBudget(String budgetId) {
         // 直接刪除預算表內的資料即可，因為沒有強關聯，所以不會動到 Transaction 表
         budgetRepository.deleteById(budgetId);
+    }
+
+    /*
+     * TransactionService.getSummary() 現在回傳 Map<String, Object>。
+     * 這個方法負責把 summary 裡面的 totalIncome / totalExpense / balance 安全轉成 BigDecimal。
+     */
+    private BigDecimal getBigDecimal(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+
+        if (value instanceof BigDecimal) {
+            return (BigDecimal) value;
+        }
+
+        if (value instanceof Number) {
+            return BigDecimal.valueOf(((Number) value).doubleValue());
+        }
+
+        return new BigDecimal(value.toString());
     }
 }

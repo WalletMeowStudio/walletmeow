@@ -11,10 +11,6 @@ public class PetResponse {
     private String petName;
 
     private Integer mood;
-<<<<<<< HEAD
-    private Integer cancan;
-    private LocalDateTime lastUpdateAt;
-=======
     
     private Integer cancan;
 
@@ -22,7 +18,6 @@ public class PetResponse {
 
     private String riveName;
 
->>>>>>> tzuchen
     private Boolean isDisplayed;
     
     private LocalDateTime lastUpdateAt;

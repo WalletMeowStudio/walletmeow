@@ -1,48 +1,28 @@
 package com.walletpet.service.impl;
 
-import com.walletpet.dto.pet.BookkeepingRewardRequest;
-import com.walletpet.dto.pet.LoginTickResponse;
-import com.walletpet.dto.pet.PetCreateRequest;
-import com.walletpet.dto.pet.PetEventCreateRequest;
-import com.walletpet.dto.pet.PetEventPageResponse;
-import com.walletpet.dto.pet.PetEventResponse;
-import com.walletpet.dto.pet.PetFeedRequest;
-<<<<<<< HEAD
-=======
-import com.walletpet.dto.pet.PetInteractRequest;
-import com.walletpet.dto.pet.PetInteractResponse;
->>>>>>> tzuchen
-import com.walletpet.dto.pet.PetResponse;
-import com.walletpet.dto.pet.PetRewardResponse;
-import com.walletpet.dto.pet.PetUpdateRequest;
-import com.walletpet.entity.Pet;
-import com.walletpet.entity.PetEvent;
-import com.walletpet.entity.User;
-import com.walletpet.entity.UserLoginLog;
-<<<<<<< HEAD
-=======
-import com.walletpet.enums.RewardType;
->>>>>>> tzuchen
-import com.walletpet.exception.BusinessException;
-import com.walletpet.mapper.PetEventMapper;
-import com.walletpet.mapper.PetMapper;
-import com.walletpet.repository.PetEventRepository;
-import com.walletpet.repository.PetRepository;
-import com.walletpet.repository.UserLoginLogRepository;
-import com.walletpet.repository.UserRepository;
-import com.walletpet.service.PetService;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import com.walletpet.dto.pet.PetResponse;
+import com.walletpet.entity.Pet;
+import com.walletpet.entity.PetModel;
+import com.walletpet.entity.User;
+import com.walletpet.exception.BusinessException;
+import com.walletpet.exception.ResourceNotFoundException;
+import com.walletpet.mapper.PetMapper;
+import com.walletpet.repository.PetModelRepository;
+import com.walletpet.repository.PetRepository;
+import com.walletpet.service.PetEventService;
+import com.walletpet.service.PetService;
+import com.walletpet.util.IdGenerator;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class PetServiceImpl implements PetService {
 
@@ -63,425 +43,333 @@ public class PetServiceImpl implements PetService {
     private static final int FEAST_MOOD_GAIN = 15;
 
     /* 每日上限 */
-    private static final int DAILY_FEED_MOOD_CAP = 3;        // 每日 +3 mood 上限（餵罐罐 / 小魚乾 / 零食 合計）
-    private static final int DAILY_BOOKKEEPING_CANCAN_CAP = 5; // 每日 +5 cancan 上限（記帳獎勵）
-
-    /* 登入 streak / 缺席 */
-    private static final int STREAK_3_BONUS = 5;
-    private static final int STREAK_7_BONUS = 10;
-    private static final int MISS_3_PENALTY = -10;
-    private static final int MISS_7_PENALTY = -20;
+    private static final int DAILY_FEED_MOOD_CAP = 3; // 每日 +3 mood 上限（餵罐罐 / 小魚乾 / 零食 合計）
 
     /* event_type 約定值（與前端 EVENT_META 對齊） */
-    private static final String EVT_FEED_CAN     = "FEED_CAN";
-    private static final String EVT_FEED_FISH    = "FEED_FISH";
-    private static final String EVT_FEED_SNACK   = "FEED_SNACK";
-    private static final String EVT_FEED_FEAST   = "FEED_FEAST";
-    private static final String EVT_BOOKKEEPING  = "BOOKKEEPING";
-    private static final String EVT_LOGIN_STREAK = "LOGIN_STREAK";
-    private static final String EVT_LOGIN_MISS   = "LOGIN_MISS";
-
-    /** 受每日 +3 mood 上限約束的事件類型集合 */
-    private static final Set<String> DAILY_CAPPED_FEED_TYPES =
-            Set.of(EVT_FEED_CAN, EVT_FEED_FISH, EVT_FEED_SNACK);
+    private static final String EVT_FEED_CAN = "PET_FEED_CAN";
+    private static final String EVT_FEED_FISH = "PET_FEED_FISH";
+    private static final String EVT_FEED_SNACK = "PET_FEED_SNACK";
+    private static final String EVT_FEED_FEAST = "PET_FEED_FEAST";
+    private static final String EVT_CANCAN_ADJUST = "DAILY_BOOKKEEPING_REWARD";
 
     private final PetRepository petRepository;
-    private final PetEventRepository petEventRepository;
-    private final UserRepository userRepository;
-    private final UserLoginLogRepository userLoginLogRepository;
 
-    public PetServiceImpl(PetRepository petRepository,
-                          PetEventRepository petEventRepository,
-                          UserRepository userRepository,
-                          UserLoginLogRepository userLoginLogRepository) {
-        this.petRepository = petRepository;
-        this.petEventRepository = petEventRepository;
-        this.userRepository = userRepository;
-        this.userLoginLogRepository = userLoginLogRepository;
-    }
+    private final PetModelRepository petModelRepository;
 
-    /* =====================================================================
-     * Pet CRUD
-     * ===================================================================== */
+    private final PetEventService petEventService;
 
-    @Override
-    public PetResponse createPet(PetCreateRequest request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new BusinessException("使用者不存在"));
-
-        if (petRepository.existsById(request.getPetId())) {
-            throw new BusinessException("寵物 ID 已存在");
-        }
-
-        Pet pet = new Pet();
-        pet.setPetId(request.getPetId());
-        pet.setUser(user);
-        pet.setPetName(request.getPetName());
-        // 規格：第一次帳號登入軟體時預設心情值 60
-        pet.setMood(clampMood(request.getMood() == null ? MOOD_DEFAULT : request.getMood()));
-        pet.setCancan(clampCancan(request.getCancan() == null ? 0 : request.getCancan()));
-        pet.setIsDisplayed(request.getIsDisplayed() == null ? true : request.getIsDisplayed());
-        pet.setLastUpdateAt(LocalDateTime.now());
-        pet.setCreatedAt(LocalDateTime.now());
-
-        return PetMapper.toResponse(petRepository.save(pet));
-    }
-
+    /*
+     * 查詢目前登入者顯示中的寵物。
+     *
+     * 一般使用者不需要傳 petId。
+     * 後端會用 currentUserId 找 isDisplayed = true 的寵物。
+     */
     @Override
     @Transactional(readOnly = true)
-    public List<PetResponse> findPetsByUserId(String userId) {
-        return petRepository.findByUser_UserIdOrderByCreatedAtDesc(userId)
-                .stream()
-                .map(PetMapper::toResponse)
-                .collect(Collectors.toList());
+    public PetResponse getMyPet(String currentUserId) {
+        Pet pet = getDisplayedPetEntity(currentUserId);
+        return PetMapper.toResponse(pet);
     }
 
+    /*
+     * 取得目前顯示寵物 Entity。
+     *
+     * 給 DailyRewardService / LoginStreakService 內部使用。
+     * 外部 API 回傳仍應使用 PetResponse。
+     */
     @Override
     @Transactional(readOnly = true)
-    public PetResponse findPetById(String petId) {
-        return PetMapper.toResponse(loadPet(petId));
+    public Pet getDisplayedPetEntity(String currentUserId) {
+        validateCurrentUserId(currentUserId);
+
+        return petRepository.findFirstByUser_UserIdAndIsDisplayedTrue(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到目前顯示的寵物"));
     }
 
+    /*
+     * 餵食。
+     *
+     * 前端只需要傳 foodType：
+     * CAN / FISH / SNACK / FEAST
+     *
+     * 不需要傳 userId。
+     * 不需要傳 petId。
+     */
     @Override
-    public PetResponse updatePet(String petId, PetUpdateRequest request) {
-        Pet pet = loadPet(petId);
+    public PetResponse feedPet(String currentUserId, String foodType) {
+        validateCurrentUserId(currentUserId);
 
-        if (request.getPetName() != null && !request.getPetName().isBlank()) {
-            pet.setPetName(request.getPetName());
+        if (!hasText(foodType)) {
+            throw new BusinessException("foodType 不可為空");
         }
-        if (request.getMood() != null) {
-            pet.setMood(clampMood(request.getMood()));
-        }
-        if (request.getCancan() != null) {
-            pet.setCancan(clampCancan(request.getCancan()));
-        }
-        if (request.getIsDisplayed() != null) {
-            pet.setIsDisplayed(request.getIsDisplayed());
-        }
 
-        pet.setLastUpdateAt(LocalDateTime.now());
-        return PetMapper.toResponse(petRepository.save(pet));
-    }
+        Pet pet = getDisplayedPetEntity(currentUserId);
+        User user = pet.getUser();
 
-    @Override
-    public void deletePet(String petId) {
-        petRepository.delete(loadPet(petId));
-    }
+        String normalizedFoodType = foodType.trim().toUpperCase();
 
-    /* =====================================================================
-     * Pet event 通用 CRUD
-     * ===================================================================== */
-
-    @Override
-    public PetEventResponse createPetEvent(PetEventCreateRequest request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new BusinessException("使用者不存在"));
-        Pet pet = loadPet(request.getPetId());
-
-        int moodDelta   = nullToZero(request.getMoodDelta());
-        int cancanDelta = nullToZero(request.getCancanDelta());
-
-        applyDeltas(pet, moodDelta, cancanDelta);
-        PetEvent saved = saveEvent(user, pet, request.getEventType(), moodDelta, cancanDelta, request.getReward());
-        petRepository.save(pet);
-
-        return PetEventMapper.toResponse(saved);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PetEventResponse> findPetEventsByUserId(String userId) {
-        return petEventRepository.findByUser_UserIdOrderByCreatedAtDesc(userId)
-                .stream()
-                .map(PetEventMapper::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PetEventResponse> findPetEventsByPetId(String petId) {
-        return petEventRepository.findByPet_PetIdOrderByCreatedAtDesc(petId)
-                .stream()
-                .map(PetEventMapper::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public void deletePetEvent(Long petEventId) {
-        PetEvent event = petEventRepository.findById(petEventId)
-                .orElseThrow(() -> new BusinessException("寵物事件不存在"));
-        petEventRepository.delete(event);
-    }
-
-    /* =====================================================================
-     * cancan 系統：餵食
-     * ===================================================================== */
-
-    @Override
-    public PetResponse feed(PetFeedRequest request) {
-        if (request.getFeedType() == null) {
-            throw new BusinessException("feedType 不可為空");
-        }
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new BusinessException("使用者不存在"));
-        Pet pet = loadPet(request.getPetId());
-
-        String type = request.getFeedType().toUpperCase();
-        switch (type) {
-            case "CAN":   return doBasicFeed(user, pet, EVT_FEED_CAN);
-            case "FISH":  return doBasicFeed(user, pet, EVT_FEED_FISH);
-            case "SNACK": return doBasicFeed(user, pet, EVT_FEED_SNACK);
-            case "FEAST": return doFeastFeed(user, pet);
+        switch (normalizedFoodType) {
+            case "CAN":
+                return doBasicFeed(user, pet, EVT_FEED_CAN, "餵食 CAN：食物量 cancan -1，心情值 mood +1");
+            case "FISH":
+                return doBasicFeed(user, pet, EVT_FEED_FISH, "餵食 FISH：食物量 cancan -1，心情值 mood +1");
+            case "SNACK":
+                return doBasicFeed(user, pet, EVT_FEED_SNACK, "餵食 SNACK：食物量 cancan -1，心情值 mood +1");
+            case "FEAST":
+                return doFeastFeed(user, pet);
             default:
-                throw new BusinessException("未知 feedType：" + request.getFeedType());
+                throw new BusinessException("未知 foodType：" + foodType);
         }
     }
 
-    private PetResponse doBasicFeed(User user, Pet pet, String eventType) {
-        if (pet.getCancan() < BASIC_FEED_COST) {
-            throw new BusinessException("罐罐不夠（需要 " + BASIC_FEED_COST + " cancan）");
+    /*
+     * 一般餵食：
+     * CAN / FISH / SNACK
+     *
+     * 食物量 cancan -1。
+     * 心情值 mood +1。
+     * 一般餵食每日 mood 增加上限 +3。
+     */
+    private PetResponse doBasicFeed(
+            User user,
+            Pet pet,
+            String eventType,
+            String reward
+    ) {
+        if (safeInt(pet.getCancan()) < BASIC_FEED_COST) {
+            throw new BusinessException("食物量 cancan 不足，無法餵食");
         }
 
-        // 每日 +3 mood 上限：合計 FEED_CAN/FISH/SNACK 在今天已經貢獻多少 mood
-        int gainedToday = sumMoodDeltaToday(user.getUserId(), DAILY_CAPPED_FEED_TYPES);
-        int allowedMoodGain = Math.max(0, DAILY_FEED_MOOD_CAP - gainedToday);
-        int moodDelta = Math.min(BASIC_FEED_MOOD_GAIN, allowedMoodGain); // 達上限時 moodDelta 會 = 0
+        int gainedToday = petEventService.sumTodayNormalFeedMoodGain(
+                user.getUserId(),
+                LocalDate.now()
+        );
+
+        int allowedMoodGain = Math.max(
+                0,
+                DAILY_FEED_MOOD_CAP - gainedToday
+        );
+
+        int moodDelta = Math.min(
+                BASIC_FEED_MOOD_GAIN,
+                allowedMoodGain
+        );
 
         int cancanDelta = -BASIC_FEED_COST;
 
         applyDeltas(pet, moodDelta, cancanDelta);
-        saveEvent(user, pet, eventType, moodDelta, cancanDelta, null);
-        petRepository.save(pet);
-        return PetMapper.toResponse(pet);
+
+        petEventService.createEvent(
+                user,
+                pet,
+                eventType,
+                moodDelta,
+                cancanDelta,
+                reward
+        );
+
+        Pet savedPet = petRepository.save(pet);
+
+        return PetMapper.toResponse(savedPet);
     }
 
-    private PetResponse doFeastFeed(User user, Pet pet) {
-        if (pet.getCancan() < FEAST_COST) {
-            throw new BusinessException("罐罐不夠（大餐需要 " + FEAST_COST + " cancan）");
+    /*
+     * 大餐：
+     * FEAST
+     *
+     * 食物量 cancan -10。
+     * 心情值 mood +15。
+     * 不受每日 mood +3 上限限制。
+     */
+    private PetResponse doFeastFeed(
+            User user,
+            Pet pet
+    ) {
+        if (safeInt(pet.getCancan()) < FEAST_COST) {
+            throw new BusinessException("食物量 cancan 不足，大餐需要 " + FEAST_COST + " cancan");
         }
-        // 大餐不受每日 +3 mood 上限約束
+
         int moodDelta = FEAST_MOOD_GAIN;
         int cancanDelta = -FEAST_COST;
+
         applyDeltas(pet, moodDelta, cancanDelta);
-        saveEvent(user, pet, EVT_FEED_FEAST, moodDelta, cancanDelta, null);
-        petRepository.save(pet);
-        return PetMapper.toResponse(pet);
+
+        petEventService.createEvent(
+                user,
+                pet,
+                EVT_FEED_FEAST,
+                moodDelta,
+                cancanDelta,
+                "餵食 FEAST：食物量 cancan -10，心情值 mood +15"
+        );
+
+        Pet savedPet = petRepository.save(pet);
+
+        return PetMapper.toResponse(savedPet);
     }
 
-    /* =====================================================================
-     * cancan 系統：記帳獎勵
-     * ===================================================================== */
-
+    /*
+     * 增加食物量 cancan。
+     *
+     * 主要給 DailyRewardService 使用。
+     * 若 DailyRewardService 已經直接操作 PetRepository，
+     * 這個方法仍可保留作為未來統一入口。
+     */
     @Override
-    public PetResponse claimBookkeepingReward(BookkeepingRewardRequest request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new BusinessException("使用者不存在"));
-        Pet pet = loadPet(request.getPetId());
+    public PetResponse increaseCancan(
+            String currentUserId,
+            Integer amount,
+            String reason
+    ) {
+        validateCurrentUserId(currentUserId);
 
-        // 每日 +5 cancan 上限：今天 BOOKKEEPING 累計給了多少
-        int givenToday = sumCancanDeltaToday(user.getUserId(), Set.of(EVT_BOOKKEEPING));
-        int allowedCancanGain = Math.max(0, DAILY_BOOKKEEPING_CANCAN_CAP - givenToday);
-        int cancanDelta = Math.min(1, allowedCancanGain); // 觸頂時 cancanDelta = 0
+        if (amount == null || amount <= 0) {
+            throw new BusinessException("增加的 cancan 數量必須大於 0");
+        }
 
-        applyDeltas(pet, 0, cancanDelta);
+        Pet pet = getDisplayedPetEntity(currentUserId);
+        User user = pet.getUser();
 
-        String reward = request.getTransactionId() == null ? null : "tx:" + request.getTransactionId();
-        saveEvent(user, pet, EVT_BOOKKEEPING, 0, cancanDelta, reward);
-        petRepository.save(pet);
+        applyDeltas(pet, 0, amount);
 
-        return PetMapper.toResponse(pet);
+        petEventService.createEvent(
+                user,
+                pet,
+                EVT_CANCAN_ADJUST,
+                0,
+                amount,
+                reason == null ? "食物量 cancan +" + amount : reason
+        );
+
+        Pet savedPet = petRepository.save(pet);
+
+        return PetMapper.toResponse(savedPet);
     }
 
-    /* =====================================================================
-     * 登入 tick：套用 streak / 缺席規則
-     * ===================================================================== */
-
+    /*
+     * 調整心情值 mood。
+     *
+     * 主要給 LoginStreakService 或 AdminPetTestService 使用。
+     */
     @Override
-    public LoginTickResponse applyLoginTick(String userId, String petId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException("使用者不存在"));
-        Pet pet = loadPet(petId);
+    public PetResponse changeMood(
+            String currentUserId,
+            Integer moodDelta,
+            String eventType,
+            String reward
+    ) {
+        validateCurrentUserId(currentUserId);
 
-        LocalDate today = LocalDate.now();
-
-        // 同一天重複呼叫只記錄一次，不重複加減 mood
-        if (userLoginLogRepository.findByUser_UserIdAndLoginDate(userId, today).isPresent()) {
-            LoginTickResponse resp = new LoginTickResponse();
-            resp.setPet(PetMapper.toResponse(pet));
-            resp.setStreakDays(currentStreak(userId, today));
-            resp.setMissedDays(null);
-            resp.setMoodDelta(0);
-            resp.setAppliedRule("NONE");
-            resp.setFirstLoginToday(false);
-            return resp;
+        if (moodDelta == null || moodDelta == 0) {
+            return getMyPet(currentUserId);
         }
 
-        // 取最近 14 筆登入紀錄（多取一點以防缺席計算用到）
-        List<UserLoginLog> recent = userLoginLogRepository.findTop14ByUser_UserIdOrderByLoginDateDesc(userId);
-
-        // 缺席天數 = 今天距上一次登入相差幾天 - 1
-        // 例：上次 4/24，今天 4/27 → diff 3 → missed = 2 天（4/25、4/26 沒登入）
-        Integer missedDays = null;
-        if (!recent.isEmpty()) {
-            long diff = ChronoUnit.DAYS.between(recent.get(0).getLoginDate(), today);
-            missedDays = diff <= 1 ? 0 : (int) (diff - 1);
+        if (!hasText(eventType)) {
+            throw new BusinessException("eventType 不可為空");
         }
 
-        // 寫今天的登入紀錄（要先寫，currentStreak 才能把今天算進來）
-        UserLoginLog log = new UserLoginLog();
-        log.setUser(user);
-        log.setLoginDate(today);
-        log.setCreatedAt(LocalDateTime.now());
-        userLoginLogRepository.save(log);
+        Pet pet = getDisplayedPetEntity(currentUserId);
+        User user = pet.getUser();
 
-        int streakDays = currentStreak(userId, today);
+        applyDeltas(pet, moodDelta, 0);
 
-        int moodDelta = 0;
-        String rule = "NONE";
+        petEventService.createEvent(
+                user,
+                pet,
+                eventType,
+                moodDelta,
+                0,
+                reward
+        );
 
-        // 規則 1：缺席懲罰（缺席 7 天優先於 3 天）
-        if (missedDays != null && missedDays >= 7) {
-            moodDelta = MISS_7_PENALTY;
-            rule = "MISS_7";
-        } else if (missedDays != null && missedDays >= 3) {
-            moodDelta = MISS_3_PENALTY;
-            rule = "MISS_3";
-        }
-        // 規則 2：連續登入加成（7 連先於 3 連；只在「剛達到」時觸發以免每天重複給）
-        else if (streakDays == 7) {
-            // 特殊：mood < 60 時自動回歸 60，否則仍給 +10
-            if (pet.getMood() < MOOD_DEFAULT) {
-                moodDelta = MOOD_DEFAULT - pet.getMood();
-                rule = "STREAK_7_RECOVER";
-            } else {
-                moodDelta = STREAK_7_BONUS;
-                rule = "STREAK_7";
-            }
-        } else if (streakDays == 3) {
-            moodDelta = STREAK_3_BONUS;
-            rule = "STREAK_3";
-        }
+        Pet savedPet = petRepository.save(pet);
 
-        if (moodDelta != 0) {
-            applyDeltas(pet, moodDelta, 0);
-            saveEvent(user, pet, rule.startsWith("MISS_") ? EVT_LOGIN_MISS : EVT_LOGIN_STREAK,
-                    moodDelta, 0, rule);
-            petRepository.save(pet);
-        }
-
-        LoginTickResponse resp = new LoginTickResponse();
-        resp.setPet(PetMapper.toResponse(pet));
-        resp.setStreakDays(streakDays);
-        resp.setMissedDays(missedDays);
-        resp.setMoodDelta(moodDelta);
-        resp.setAppliedRule(rule);
-        resp.setFirstLoginToday(true);
-        return resp;
+        return PetMapper.toResponse(savedPet);
     }
 
-    /* =====================================================================
-     * 共用 helper
-     * ===================================================================== */
+    /*
+     * 建立新使用者的預設寵物。
+     *
+     * 註冊流程呼叫。
+     * modelId 目前固定為 1。
+     */
+    @Override
+    public void createDefaultPetForUser(
+            User user,
+            String petName
+    ) {
+        if (user == null || !hasText(user.getUserId())) {
+            throw new BusinessException("使用者不可為空");
+        }
 
-    private Pet loadPet(String petId) {
-        return petRepository.findById(petId)
-                .orElseThrow(() -> new BusinessException("寵物不存在"));
+        if (!hasText(petName)) {
+            throw new BusinessException("寵物名稱不可為空");
+        }
+
+        boolean alreadyHasDisplayedPet = petRepository
+                .findFirstByUser_UserIdAndIsDisplayedTrue(user.getUserId())
+                .isPresent();
+
+        if (alreadyHasDisplayedPet) {
+            return;
+        }
+
+        PetModel defaultModel = petModelRepository.findById(1)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到預設寵物模型"));
+
+        Pet pet = new Pet();
+        pet.setPetId(IdGenerator.generate("PET"));
+        pet.setUser(user);
+        pet.setModel(defaultModel);
+        pet.setPetName(petName.trim());
+        pet.setMood(MOOD_DEFAULT);
+        pet.setCancan(0);
+        pet.setIsDisplayed(true);
+        pet.setLastUpdateAt(LocalDateTime.now());
+        pet.setCreatedAt(LocalDateTime.now());
+
+        petRepository.save(pet);
     }
 
-    private int clampMood(int v)   { return Math.max(MOOD_MIN, Math.min(MOOD_MAX, v)); }
-    private int clampCancan(int v) { return Math.max(0, v); }
-    private int nullToZero(Integer v) { return v == null ? 0 : v; }
+    /*
+     * 套用 mood / cancan 變動量並限制合法區間。
+     */
+    private void applyDeltas(
+            Pet pet,
+            int moodDelta,
+            int cancanDelta
+    ) {
+        if (pet == null) {
+            throw new BusinessException("寵物資料不可為空");
+        }
 
-    /** 套用 mood / cancan 變動量並 clamp 到合法區間 */
-    private void applyDeltas(Pet pet, int moodDelta, int cancanDelta) {
-        pet.setMood(clampMood(pet.getMood() + moodDelta));
-        pet.setCancan(clampCancan(pet.getCancan() + cancanDelta));
+        int currentMood = safeInt(pet.getMood());
+        int currentCancan = safeInt(pet.getCancan());
+
+        pet.setMood(clampMood(currentMood + moodDelta));
+        pet.setCancan(clampCancan(currentCancan + cancanDelta));
         pet.setLastUpdateAt(LocalDateTime.now());
     }
 
-    private PetEvent saveEvent(User user, Pet pet, String eventType,
-                               int moodDelta, int cancanDelta, String reward) {
-        PetEvent event = new PetEvent();
-        event.setUser(user);
-        event.setPet(pet);
-        event.setEventType(eventType);
-        event.setMoodDelta(moodDelta);
-        event.setCancanDelta(cancanDelta);
-        event.setReward(reward);
-        event.setCreatedAt(LocalDateTime.now());
-        return petEventRepository.save(event);
-    }
-
-    private int sumMoodDeltaToday(String userId, Set<String> eventTypes) {
-        LocalDateTime start = LocalDate.now().atStartOfDay();
-        LocalDateTime end   = start.plusDays(1);
-        return petEventRepository.sumMoodDeltaByUserAndTypeAndPeriod(userId, eventTypes, start, end);
-    }
-
-    private int sumCancanDeltaToday(String userId, Set<String> eventTypes) {
-        LocalDateTime start = LocalDate.now().atStartOfDay();
-        LocalDateTime end   = start.plusDays(1);
-        return petEventRepository.sumCancanDeltaByUserAndTypeAndPeriod(userId, eventTypes, start, end);
-    }
-
-    /**
-     * 計算「今天」所在的連續登入天數。
-     * 演算法：從今天往回掃 user_login_logs，遇到斷掉就停。
-     */
-    private int currentStreak(String userId, LocalDate today) {
-        List<UserLoginLog> recent = userLoginLogRepository.findTop14ByUser_UserIdOrderByLoginDateDesc(userId);
-        if (recent.isEmpty()) return 0;
-
-        int streak = 0;
-        LocalDate cursor = today;
-        for (UserLoginLog log : recent) {
-            if (log.getLoginDate().equals(cursor)) {
-                streak++;
-                cursor = cursor.minusDays(1);
-            } else if (log.getLoginDate().isBefore(cursor)) {
-                break;
-            }
-            // 若 loginDate 在 cursor 之後（不該發生但保險），略過
+    private void validateCurrentUserId(String currentUserId) {
+        if (!hasText(currentUserId)) {
+            throw new BusinessException("使用者不可為空");
         }
-        return streak;
     }
 
-    @SuppressWarnings("unused")
-    private LocalDateTime dayBoundary(LocalDate d) {
-        return LocalDateTime.of(d, LocalTime.MIDNIGHT);
+    private int clampMood(int value) {
+        return Math.max(MOOD_MIN, Math.min(MOOD_MAX, value));
     }
-<<<<<<< HEAD
-=======
 
-	@Override
-	public PetResponse getMyPet(String currentUserId) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    private int clampCancan(int value) {
+        return Math.max(0, value);
+    }
 
-	@Override
-	public PetInteractResponse interact(String currentUserId, PetInteractRequest request) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    private int safeInt(Integer value) {
+        return value == null ? 0 : value;
+    }
 
-	@Override
-	public PetRewardResponse applyBookkeepingReward(String currentUserId, RewardType rewardType, Integer rewardValue,
-			Integer moodDelta) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public PetEventPageResponse getMyPetEvents(String currentUserId, int page, int size) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public void createDefaultPetForUser(User user, String petName) {
-		// TODO Auto-generated method stub
-		
-	}
->>>>>>> tzuchen
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
 }
