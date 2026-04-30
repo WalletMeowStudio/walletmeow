@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WalletPet — Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&family=Gloria+Hallelujah&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./shared.css">
+<style>
+  /* === login-specific layout (landscape-first, two-panel) === */
+  .login-wrap{
+    display:grid;grid-template-columns: 1.1fr .9fr;gap:20px;align-items:stretch;
+    flex:1;min-height:0;
+  }
+  .login-hero{
+    border:2.5px solid var(--ink);border-radius:16px;
+    background:
+      radial-gradient(circle at 80% 20%, var(--accent-soft) 0%, transparent 55%),
+      var(--paper);
+    padding:28px;position:relative;overflow:hidden;
+    box-shadow:4px 4px 0 var(--ink);
+    display:flex;flex-direction:column;
+  }
+  .login-hero h1{font-family:'Caveat';font-size:64px;margin:10px 0;line-height:.95;flex:0 0 auto}
+  .login-hero .pill-row{display:flex;gap:8px;margin-top:4px}
+  .login-hero .floaty{
+    margin-top:auto;align-self:flex-end;
+    width:min(320px, 60%);aspect-ratio:1;
+    border:2px dashed var(--ink);border-radius:50%;
+    background: repeating-linear-gradient(45deg, rgba(0,0,0,.05) 0 8px, transparent 8px 16px);
+    display:grid;place-items:center;font-family:'Caveat';color:var(--ink-soft);font-size:20px;text-align:center;
+  }
+  .login-right{display:flex;flex-direction:column;gap:16px;height:100%;min-height:0}
+  .sign-card{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;padding:28px;gap:22px}
+  .sign-card .welcome h2{font-family:'Caveat';font-size:44px;margin:0;line-height:1}
+  .sign-card .welcome p{font-family:'Kalam';color:var(--muted);font-size:15px;margin:6px 0 0}
+  .sign-card .field-stack{display:flex;flex-direction:column;gap:14px;flex:1;justify-content:center}
+  .sign-card .input.lg{font-size:18px;padding:12px 14px}
+  .foot-card{padding:14px 16px}
+  #loginError{
+    color:var(--rose);font-family:'Kalam';font-size:13px;min-height:18px;
+    border:1.5px dashed var(--rose);border-radius:6px;padding:4px 8px;
+    display:none;
+  }
+  #loginError.show{display:block}
+
+  @media (max-width: 899px){
+    .login-wrap{grid-template-columns: 1fr 1fr;gap:10px;min-height:calc(100vh - 66px)}
+    .login-hero{padding:14px;min-height:unset}
+    .login-hero h1{font-size:36px;margin:4px 0}
+    .login-hero .floaty{width:140px;font-size:14px}
+    .sign-card{padding:12px;gap:10px}
+    .sign-card .welcome h2{font-size:26px}
+    .sign-card .welcome p{font-size:12px;margin:2px 0 0}
+    .sign-card .field-stack{gap:8px}
+    .sign-card .input.lg{font-size:14px;padding:6px 10px}
+    label.field{margin-bottom:4px}
+    label.field span{font-size:14px}
+    .foot-card{padding:6px 10px;font-size:11px}
+  }
+</style>
+</head>
+<body>
+
+
+<main>
+  <form id="loginForm" class="login-wrap" autocomplete="on" novalidate>
+    <div class="login-hero">
+      <h1>WalletPet</h1>
+      <div class="pill-row">
+        <span class="pill accent">MVP</span>
+        <span class="pill">v0.1</span>
+      </div>
+      <div class="floaty">
+        [ illustration placeholder ]<br/>
+        <small style="font-family:'Kalam';font-size:13px">cat + coin jar</small>
+      </div>
+    </div>
+
+    <div class="login-right">
+      <div class="card sign-card" data-wp-toolbar-anchor data-page="login">
+        <div class="welcome">
+          <h2>Welcome back</h2>
+          <p>Sign in to see how Mochi's doing today.</p>
+        </div>
+        <div class="field-stack">
+          <label class="field">
+            <span>userName</span>
+            <input class="input lg" id="userName" name="userName" autocomplete="username" required placeholder="yourname"/>
+          </label>
+          <label class="field">
+            <span>password</span>
+            <input class="input lg" id="password" name="password" type="password" autocomplete="current-password" required placeholder="••••••••"/>
+          </label>
+          <div class="row" style="justify-content:space-between;font-size:13px;color:var(--muted)">
+            <label class="row" style="gap:6px"><input type="checkbox" id="rememberMe"/> Remember me</label>
+            <a href="#" style="color:inherit;font-family:'Caveat';font-size:18px">Forgot?</a>
+          </div>
+          <div id="loginError" role="alert"></div>
+        </div>
+        <div class="row" style="gap:10px">
+          <button type="submit" class="btn primary" style="flex:1;justify-content:center;font-size:20px">Sign in</button>
+          <button type="button" class="btn" id="createAccountBtn" style="flex:1;justify-content:center;font-size:20px">Create account</button>
+        </div>
+      </div>
+
+      <div class="card foot-card">
+        <div class="row" style="justify-content:space-between;font-size:13px;color:var(--muted);flex-wrap:wrap;gap:8px">
+          <span>© 2026 WalletPet</span>
+          <span class="row" style="gap:14px">
+            <a href="#" style="color:inherit">Privacy</a>
+            <a href="#" style="color:inherit">Terms</a>
+            <a href="#" style="color:inherit">Status</a>
+          </span>
+        </div>
+      </div>
+    </div>
+  </form>
+</main>
+
+<div data-wp-tweaks></div>
+
+<script src="./shared.js"></script>
+<script src="./api.js"></script>
+<script>
+/* ==============================================================
+   Login page — 串接 POST /api/auth/login
+   LoginRequest:  { userName, password }
+   LoginResponse: { token, userId, userName, role, mood? }
+   ============================================================== */
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('loginError');
+  err.classList.remove('show'); err.textContent = '';
+
+  const userName = document.getElementById('userName').value.trim();
+  const password  = document.getElementById('password').value;
+
+  if (!userName || !password) {
+    err.textContent = '請輸入帳號與密碼';
+    err.classList.add('show');
+    return;
+  }
+
+  try {
+    const data = await WalletPet.authApi.login({ userName, password });
+    if (!data || !data.token) throw new Error('登入回應缺少 token');
+
+    WalletPet.api.setToken(data.token);
+    localStorage.setItem('walletpet.user', JSON.stringify({
+      userId:   data.userId,
+      userName: data.userName,
+      role:      data.role,
+      mood:      data.mood,
+    }));
+    location.href = 'dashboard.html';
+  } catch (ex) {
+    err.textContent = ex.message || '登入失敗';
+    err.classList.add('show');
+  }
+});
+
+document.getElementById('createAccountBtn').addEventListener('click', () => {
+  // TODO: 第 2 組彥祥決定 register 是獨立頁或 modal
+  alert('註冊功能尚在開發中 · RegisterView.vue');
+});
+</script>
+</body>
+</html>

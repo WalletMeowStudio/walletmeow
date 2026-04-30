@@ -1,0 +1,602 @@
+/* =========================================================
+   WalletPet — Shared Stylesheet
+   統一所有頁面的外觀、響應式行為、設計 tokens
+   版本: v1.0  |  日期: 2026-04-23
+   ========================================================= */
+
+/* ---------- design tokens ---------- */
+:root{
+  --ink:#1d1a17;
+  --ink-soft:#3a332d;
+  --muted:#8a8178;
+  --paper:#f6f1e7;
+  --paper-deep:#ece4d2;
+  --line:#2a2622;
+  --accent:#e8643a;           /* warm tangerine */
+  --accent-soft:#ffd9c8;
+  --green:#2e8b57;
+  --blue:#5d7ce2;
+  --gold:#d8a22d;
+  --rose:#d76565;
+  --shadow: 0 2px 0 rgba(0,0,0,.08), 0 20px 40px -20px rgba(0,0,0,.18);
+}
+
+/* ---------- base ---------- */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:'Kalam',system-ui,sans-serif}
+html,body{height:100%;overflow:hidden}        /* viewport-fit: 不讓外層捲動 */
+body{
+  background-image:
+    radial-gradient(rgba(0,0,0,.035) 1px, transparent 1px),
+    radial-gradient(rgba(0,0,0,.025) 1px, transparent 1px);
+  background-size: 24px 24px, 7px 7px;
+  background-position: 0 0, 3px 3px;
+  display:flex;flex-direction:column;
+}
+body.scroll-ok{overflow:auto}                  /* login 頁需要允許捲動時加這 class */
+body.scroll-ok, body.scroll-ok html{height:auto;overflow:auto}
+
+/* =========================================================
+   TOP-RIGHT TOOLBAR — 錨定在頁面的右側 block 內部頂端
+   [🐾 mood chip] [⋮ kebab menu]
+   不再貼在瀏覽器視窗邊,而是對齊 block 的右上角
+   ========================================================= */
+.wp-toolbar{
+  display:flex;gap:8px;align-items:center;justify-content:flex-end;
+  font-family:'Kalam';
+  flex:0 0 auto;           /* 不撐開 flex 容器 */
+  margin-bottom:4px;
+  margin-left:auto;        /* 在 flex row 容器中推到最右邊 */
+  align-self:flex-end;     /* 在 flex column 容器中靠右 */
+}
+/* 當 anchor 是 card / panel (有 padding) 時, toolbar 用絕對定位貼在右上角不佔空間 */
+.card[data-wp-toolbar-anchor],
+.panel[data-wp-toolbar-anchor]{position:relative}
+.card[data-wp-toolbar-anchor] > .wp-toolbar,
+.panel[data-wp-toolbar-anchor] > .wp-toolbar{
+  position:absolute;top:12px;right:12px;margin:0;z-index:20;
+}
+
+/* mood chip (可點擊連結到 pets 頁) */
+.chip{
+  white-space:nowrap;
+  border:2px solid var(--ink);border-radius:999px;padding:5px 14px;
+  font-family:'Caveat';font-size:18px;background:#fff;
+  box-shadow:2px 2px 0 var(--ink);
+  text-decoration:none;color:var(--ink);cursor:pointer;
+  transition:transform .08s ease;
+  display:inline-block;
+}
+.chip.accent{background:var(--accent-soft)}
+.chip:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+.chip:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+
+/* kebab button (三點按鈕) */
+.kebab{
+  width:40px;height:40px;border-radius:12px;
+  border:2px solid var(--ink);background:#fff;
+  display:grid;place-items:center;cursor:pointer;
+  box-shadow:2px 2px 0 var(--ink);
+  font-family:'Caveat';line-height:1;padding:0;
+  transition:transform .08s ease;
+}
+.kebab:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+.kebab:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+.kebab-dots{display:flex;flex-direction:column;gap:3px}
+.kebab-dots span{
+  width:5px;height:5px;background:var(--ink);border-radius:50%;display:block;
+}
+
+/* kebab menu dropdown */
+.kebab-menu{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:100;
+  min-width:200px;max-height:calc(100vh - 80px);overflow:auto;
+  background:#fff;border:2.5px solid var(--ink);border-radius:12px;
+  box-shadow:4px 4px 0 var(--ink);
+  padding:6px;display:none;
+}
+.kebab-menu.open{display:block}
+.kebab-item{
+  display:block;padding:8px 14px;
+  font-family:'Caveat';font-size:20px;
+  color:var(--ink);text-decoration:none;
+  border-radius:8px;cursor:pointer;
+  border:none;background:transparent;width:100%;text-align:left;
+}
+.kebab-item:hover{background:var(--accent-soft)}
+.kebab-item.current{background:var(--accent-soft);position:relative}
+.kebab-item.logout-item{
+  border-top:1.5px dashed var(--ink-soft);
+  margin-top:4px;padding-top:10px;
+  color:var(--rose);
+}
+.kebab-item.logout-item:hover{background:#ffe5e5}
+.kebab-item.current::after{
+  content:"●";position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  color:var(--accent);font-size:12px;
+}
+.kebab-wrap{position:relative}
+
+/* 手機橫向模式:工具列縮小 */
+@media (max-width: 899px){
+  .wp-toolbar{top:6px;right:6px;gap:6px}
+  .chip{font-size:15px;padding:3px 10px}
+  .kebab{width:32px;height:32px;border-radius:10px}
+  .kebab-dots span{width:4px;height:4px}
+  .kebab-menu{min-width:170px}
+  .kebab-item{font-size:17px;padding:6px 12px}
+}
+
+/* ---------- page shell ---------- */
+/* viewport-fit: main 佔滿整個 viewport (因為 toolbar 是 fixed) */
+main{
+  flex:1;min-height:0;
+  padding:18px 24px;
+  width:100%;max-width:1600px;
+  margin:0 auto;
+  display:flex;flex-direction:column;gap:10px;
+  overflow:hidden;
+}
+
+.page-title{
+  font-family:'Caveat';font-size:38px;font-weight:700;line-height:1;
+  margin:0;display:flex;align-items:center;gap:14px;flex:0 0 auto;
+  min-height:44px;   /* 確保 toolbar 高度放得下 */
+  position:relative;z-index:30;   /* 讓內含的下拉菜單能蓋過下方內容 */
+}
+.page-title .count{font-size:16px;color:var(--muted);font-family:'Kalam'}
+.page-sub{font-family:'Kalam';color:var(--ink-soft);margin:0 0 4px;font-size:14px;flex:0 0 auto}
+
+/* ---------- wireframe primitives ---------- */
+.card{
+  background:var(--paper);
+  border:2.5px solid var(--ink);
+  border-radius:14px;
+  padding:18px;
+  position:relative;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.card.dashed{border-style:dashed;border-width:2px;box-shadow:none;background:transparent}
+.card .tag{
+  position:absolute;top:-12px;left:14px;
+  background:var(--paper);padding:0 8px;
+  font-family:'Caveat';font-size:18px;color:var(--ink-soft);
+  border:1px dashed var(--ink-soft);border-radius:6px;
+}
+.card h3{
+  font-family:'Caveat';font-size:26px;font-weight:600;margin:0 0 10px;
+  display:flex;align-items:center;gap:8px;
+}
+.card h3 small{font-family:'Kalam';font-size:13px;color:var(--muted);font-weight:400}
+
+.grid{display:grid;gap:20px}
+.g-2{grid-template-columns:repeat(2,1fr)}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-4{grid-template-columns:repeat(4,1fr)}
+
+/* ---------- "analytics-shell" outer container (common layout) ---------- */
+.shell{
+  border:2px solid var(--ink);
+  border-radius:18px;
+  background:rgba(255,255,255,.15);
+  box-shadow:4px 4px 0 var(--ink);
+  padding:14px;
+  flex:1;min-height:0;
+  display:flex;flex-direction:column;
+}
+.shell-topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;
+  flex:0 0 auto;
+}
+.shell-topbar-left{display:flex;align-items:center;gap:8px}
+.shell-name{font-family:'Caveat';font-size:30px;line-height:1}
+.shell-note{font-size:11px;color:var(--muted)}
+
+/* split-grid: used by transactions / transfers / goals */
+.split-grid{
+  display:grid;grid-template-columns: minmax(280px, 380px) 1fr;gap:14px;
+  flex:1;min-height:0;
+}
+.panel{
+  min-width:0;min-height:0;overflow:hidden;
+  border:2px solid var(--ink);border-radius:14px;background:rgba(255,255,255,.22);
+  box-shadow:3px 3px 0 var(--ink);
+  display:flex;flex-direction:column;padding:12px;gap:10px;
+}
+
+/* placeholder shapes */
+.ph{
+  background: repeating-linear-gradient(135deg, var(--paper-deep) 0 8px, transparent 8px 16px);
+  border:1.5px dashed var(--ink-soft);
+  border-radius:8px;
+  display:grid;place-items:center;
+  font-family:'Caveat';color:var(--ink-soft);font-size:18px;
+  min-height:60px;padding:14px;text-align:center;
+}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:'Caveat';font-size:20px;
+  border:2px solid var(--ink);background:#fff;
+  border-radius:10px;padding:4px 14px;cursor:pointer;
+  box-shadow:2px 2px 0 var(--ink);
+  color:var(--ink);text-decoration:none;
+}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.ghost{background:transparent;box-shadow:none}
+.btn.sm{font-size:16px;padding:2px 10px}
+
+/* segmented control (expense / income toggle, etc.) */
+.seg{display:flex;gap:8px;flex-wrap:wrap;width:100%}
+.seg-btn{
+  border:2px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:10px;padding:6px 10px;
+  font-family:'Caveat';font-size:18px;line-height:1;cursor:pointer;
+  box-shadow:2px 2px 0 var(--ink);
+  flex:1 1 calc(50% - 8px);min-width:0;
+}
+.seg-btn.active{background:var(--accent-soft)}
+
+/* ---------- inputs ---------- */
+.input{
+  border:2px solid var(--ink);border-radius:8px;background:#fff;
+  padding:6px 10px;font-family:'Kalam';font-size:14px;width:100%;
+  color:var(--ink);
+}
+.input.lg{padding:10px 12px;font-size:16px}
+.input:focus{outline:2px solid var(--accent);outline-offset:1px}
+label.field{display:block;margin-bottom:10px}
+label.field span{font-family:'Caveat';font-size:18px;display:block;margin-bottom:2px}
+label.field small{font-family:'Kalam';font-size:12px;color:var(--muted);font-weight:400}
+
+/* form-card standard layout for edit/create forms */
+.form-card{display:flex;flex-direction:column;padding:16px;gap:10px}
+.form-spacer{flex:1;min-height:6px}
+
+/* ---------- table ---------- */
+table.wire{width:100%;border-collapse:collapse;font-size:14px}
+table.wire th,table.wire td{
+  text-align:left;padding:10px 10px;border-bottom:1.5px dashed var(--ink-soft);
+  font-family:'Kalam';
+}
+table.wire th{font-family:'Caveat';font-size:17px;font-weight:600;color:var(--ink-soft);border-bottom:2px solid var(--ink)}
+table.wire tr:hover td{background:rgba(0,0,0,.03)}
+.amt-pos{color:var(--green)}
+.amt-neg{color:var(--rose)}
+.pos{color:var(--green)}
+.neg{color:var(--rose)}
+.pill{display:inline-block;border:1.5px solid var(--ink);border-radius:999px;padding:1px 10px;font-size:12px;background:#fff}
+.pill.accent{background:var(--accent-soft)}
+
+/* table scroll wrapper (for long lists inside cards) */
+.table-scroll{max-height:100%;overflow:auto}
+
+/* ---------- progress bar ---------- */
+.bar{height:10px;background:var(--paper-deep);border:1.5px solid var(--ink);border-radius:999px;overflow:hidden;position:relative}
+.bar > i{display:block;height:100%;background:var(--accent);}
+.bar.stripe > i{
+  background: repeating-linear-gradient(45deg, var(--accent) 0 6px, #ff8a66 6px 12px);
+}
+.bar.over > i{background:var(--rose)}
+
+/* ---------- toolbar ---------- */
+.toolbar{
+  display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+  border:2px dashed var(--ink);border-radius:12px;padding:12px 14px;
+  margin-bottom:14px;background:rgba(255,255,255,.3);
+}
+.toolbar .spacer{flex:1}
+
+/* ---------- block label ---------- */
+.block-label{
+  font-family:'Caveat';font-size:14px;color:var(--muted);
+  border:1px dashed var(--muted);border-radius:4px;padding:1px 8px;
+  display:inline-block;
+}
+
+/* ---------- KPI ---------- */
+.kpi{display:flex;align-items:baseline;gap:10px}
+.kpi .n{font-family:'Caveat';font-size:40px;font-weight:700;line-height:1}
+.kpi .l{font-family:'Kalam';color:var(--muted);font-size:13px}
+.mini-stat{display:flex;justify-content:space-between;gap:4px;font-family:'Kalam';font-size:13px;color:var(--ink-soft);margin-top:4px;white-space:nowrap}
+.mini-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mini-card{border:2px solid var(--ink);border-radius:10px;background:#fff;padding:7px 8px;min-width:0}
+.mini-label{font-size:11px;color:var(--muted);line-height:1.05;margin-bottom:5px}
+.mini-value{font-family:'Caveat';font-size:20px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- chart area ---------- */
+.chart{
+  height:130px;border:1.5px dashed var(--ink-soft);border-radius:8px;
+  position:relative;overflow:hidden;
+  background:
+    linear-gradient(to top, rgba(0,0,0,.04) 0 1px, transparent 1px) repeat-y,
+    linear-gradient(to right, rgba(0,0,0,.04) 0 1px, transparent 1px) repeat-x;
+  background-size: 100% 26px, 36px 100%;
+}
+.chart svg{width:100%;height:100%;display:block}
+
+.chart-box{
+  flex:1;min-height:260px;border:1.5px dashed var(--ink-soft);border-radius:12px;
+  background:
+    linear-gradient(to top, rgba(0,0,0,.035) 0 1px, transparent 1px) repeat-y,
+    linear-gradient(to right, rgba(0,0,0,.035) 0 1px, transparent 1px) repeat-x,
+    #fffaf2;
+  background-size:100% 26px,36px 100%,auto;position:relative;overflow:hidden;
+}
+.chart-box svg{width:100%;height:100%;display:block}
+.chart-legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft)}
+.chart-legend span{display:flex;align-items:center;gap:4px}
+.dot{width:9px;height:9px;border:1.5px solid var(--ink);border-radius:50%;display:inline-block}
+
+/* ---------- pet stage ---------- */
+.pet-stage{
+  aspect-ratio: 16/10;
+  background: radial-gradient(circle at 30% 30%, #fff 0%, var(--paper-deep) 70%);
+  border:2.5px solid var(--ink);border-radius:16px;
+  position:relative;overflow:hidden;display:grid;place-items:center;
+  box-shadow:4px 4px 0 var(--ink);
+}
+.pet-stage .hint{position:absolute;top:12px;left:12px;font-family:'Caveat';font-size:18px;color:var(--ink-soft)}
+.pet-stage .rive-box{
+  width:62%;aspect-ratio:1;border:2px dashed var(--ink);border-radius:20px;
+  background: repeating-linear-gradient(135deg, rgba(0,0,0,.04) 0 10px, transparent 10px 20px);
+  display:grid;place-items:center;text-align:center;
+  font-family:'Caveat';font-size:26px;color:var(--ink-soft);
+}
+.pet-stage .rive-box small{display:block;font-family:'Kalam';font-size:13px;color:var(--muted);margin-top:4px}
+.pet-stage.rive-clean{background:var(--paper-deep);border:2px dashed var(--ink);display:flex;align-items:center;justify-content:center;padding:0;aspect-ratio:auto}
+.rive-box-plain{font-family:'Caveat';font-size:40px;color:var(--muted)}
+
+/* ---------- utilities ---------- */
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:8px}
+.divider{height:0;border-top:1.5px dashed var(--ink-soft);margin:8px 0}
+
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-family:'Kalam';font-size:13px;color:var(--ink-soft)}
+.legend i{display:inline-block;width:10px;height:10px;border:1.5px solid var(--ink);margin-right:4px;vertical-align:middle}
+
+/* tile (categories / accounts) */
+.tile{
+  border:2px solid var(--ink);border-radius:12px;padding:12px;
+  background:#fff;box-shadow:3px 3px 0 var(--ink);
+  display:flex;gap:10px;align-items:center;
+}
+.tile .icn{
+  width:42px;height:42px;border:2px solid var(--ink);border-radius:10px;
+  background:var(--accent-soft);display:grid;place-items:center;
+  font-family:'Caveat';font-size:22px;flex-shrink:0;
+}
+.tile .t-name{font-family:'Caveat';font-size:20px;line-height:1}
+.tile-add{
+  border:2px dashed var(--ink-soft);color:var(--ink-soft);background:transparent;
+  box-shadow:none;display:grid;place-items:center;font-family:'Caveat';font-size:22px;cursor:pointer;
+}
+
+/* fab (floating action button) */
+.fab{
+  position:absolute;right:22px;bottom:22px;width:64px;height:64px;border-radius:50%;
+  background:var(--accent);color:var(--paper);border:2.5px solid var(--ink);
+  display:grid;place-items:center;font-family:'Caveat';font-size:42px;line-height:1;
+  text-decoration:none;box-shadow:3px 3px 0 var(--ink);cursor:pointer;
+  transition:transform .08s ease;
+}
+.fab:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+.fab:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+
+/* tab-switch (goals/budgets) */
+.tab-switch{display:flex;gap:8px;margin-bottom:10px}
+.t-btn{
+  flex:1;
+  border:2px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:10px;padding:8px 12px;
+  font-family:'Caveat';font-size:20px;cursor:pointer;
+  box-shadow:2px 2px 0 var(--ink);
+  /* 確保 inactive 和 active 的 font-weight / padding 完全一致, 避免視覺重量不一 */
+  line-height:1;
+  transition:background .1s, color .1s;
+}
+.t-btn.active{
+  background:var(--accent);color:#fff;
+  /* 不加 font-weight:700, 因為 main * 已經是 bolder, 重複會讓 active 看起來比 inactive 更大 */
+}
+
+/* pager (analytics-style) */
+.pager{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pager-label{font-size:11px;color:var(--muted);margin-right:2px}
+.pager button{
+  min-width:36px;font-size:15px;padding:4px 0;
+  border:2px solid var(--ink);background:#fff;color:var(--ink);border-radius:10px;
+  font-family:'Caveat';cursor:pointer;box-shadow:2px 2px 0 var(--ink);
+}
+.pager button.active{background:var(--accent-soft)}
+
+/* ---------- table pager (for list pages) ---------- */
+.wp-pager{
+  flex:0 0 auto;
+  display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
+  padding:6px 4px 2px;font-family:'Kalam';
+}
+.wp-pager button{
+  min-width:32px;height:30px;padding:0 8px;
+  border:2px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:8px;cursor:pointer;
+  font-family:'Caveat';font-size:16px;line-height:1;
+  box-shadow:2px 2px 0 var(--ink);
+  transition:transform .08s ease;
+}
+.wp-pager button:hover:not(:disabled){transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+.wp-pager button:active:not(:disabled){transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+.wp-pager button.active{background:var(--accent-soft);cursor:default}
+.wp-pager button:disabled{opacity:.35;cursor:not-allowed;box-shadow:1px 1px 0 var(--ink)}
+.wp-pager .pg-nav{font-size:20px;font-weight:700}
+.wp-pager .pg-gap{color:var(--muted);font-size:14px;padding:0 2px}
+.wp-pager .pg-info{margin-left:8px;font-size:12px;color:var(--muted);white-space:nowrap}
+
+@media (max-width: 899px){
+  .wp-pager{padding:4px 2px 0;gap:4px}
+  .wp-pager button{min-width:26px;height:24px;padding:0 6px;font-size:13px}
+  .wp-pager .pg-nav{font-size:16px}
+  .wp-pager .pg-info{font-size:10px;margin-left:4px}
+}
+
+/* time segment (day/week/month) */
+.time-seg{display:flex;gap:6px;flex-wrap:nowrap}
+.time-seg button{
+  padding:5px 10px;font-size:17px;min-width:62px;
+  border:2px solid var(--ink);background:#fff;color:var(--ink);border-radius:10px;
+  font-family:'Caveat';cursor:pointer;line-height:1;box-shadow:2px 2px 0 var(--ink);
+}
+.time-seg button.active{
+  background:var(--accent);color:#fff;
+  border-color:var(--ink);
+  font-weight:700;
+}
+
+/* detail list (analytics-style) */
+.row-h,.detail-row{display:grid;grid-template-columns:64px 1fr 84px;gap:8px}
+.row-h{padding:0 4px 5px;font-size:11px;color:var(--muted);border-bottom:1.5px solid var(--ink)}
+.rows{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:5px}
+.detail-row{
+  align-items:center;padding:5px 5px;border:1.5px solid rgba(42,38,34,.12);
+  border-radius:8px;background:rgba(255,255,255,.82);
+}
+.d-time{font-size:11px;color:var(--muted);white-space:nowrap}
+.d-main{min-width:0}
+.d-title{font-size:13px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-sub{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-amt{text-align:right;font-family:'Caveat';font-size:18px;line-height:1;white-space:nowrap}
+.footer-note{font-size:10px;color:var(--muted);text-align:right}
+
+/* ---------- tweaks panel ---------- */
+.tweaks{
+  position:fixed;right:18px;bottom:18px;z-index:80;
+  background:#fff;border:2.5px solid var(--ink);border-radius:14px;
+  padding:14px 16px;box-shadow:4px 4px 0 var(--ink);
+  font-family:'Kalam';width:250px;display:none;
+}
+.tweaks.open{display:block}
+.tweaks h4{font-family:'Caveat';font-size:22px;margin:0 0 8px}
+.tweaks .row{display:flex;align-items:center;justify-content:space-between;margin:8px 0;font-size:14px}
+.swatches{display:flex;gap:6px}
+.sw{width:22px;height:22px;border:2px solid var(--ink);border-radius:50%;cursor:pointer}
+.sw.sel{outline:2px dashed var(--ink);outline-offset:2px}
+
+/* ---------- sketchy / clean modes ---------- */
+body.clean .card, body.clean .page-select, body.clean .btn, body.clean .chip,
+body.clean .avatar, body.clean .pet-stage, body.clean .tweaks,
+body.clean .shell, body.clean .panel, body.clean .tile, body.clean .mini-card,
+body.clean .seg-btn, body.clean .t-btn, body.clean .pager button, body.clean .time-seg button{
+  box-shadow: 0 2px 10px rgba(0,0,0,.06) !important;
+  border-radius:10px;
+}
+body.clean .logo .mark{border-radius:8px}
+
+/* density */
+body.compact .card{padding:12px}
+body.compact table.wire th,body.compact table.wire td{padding:6px 8px}
+body.compact main{padding:12px 18px}
+
+/* =========================================================
+   RESPONSIVE: viewport-fit everywhere, landscape-first on phones
+   ========================================================= */
+
+/* tablet / small desktop: tighten padding */
+@media (max-width: 1100px){
+  main{padding:14px 18px}
+}
+
+/* ========== 全站字體加粗 (桌機+手機都套用, 提升可讀性) ==========
+ * 用 bolder 而非固定 700, 讓每個元素相對加粗一級,
+ * 原本 400 → 700, 原本 600 → 更粗, 不影響已粗元素. */
+main *{font-weight:bolder}
+
+/* phones in LANDSCAPE: compact HUD layout, single-screen no-scroll */
+@media (max-width: 899px){
+  main{padding:8px 10px;gap:6px}
+  .page-title{font-size:22px}
+  .page-title .count{font-size:14px}
+  .page-sub{display:none}
+
+  .shell{flex:1;min-height:0;padding:8px;border-radius:14px;display:flex;flex-direction:column}
+  .shell-topbar{margin-bottom:6px}
+  .shell-name{font-size:22px}
+  .shell-note{font-size:10px}
+
+  .split-grid{
+    grid-template-columns: minmax(220px, 300px) 1fr;
+    gap:8px;min-height:0;
+  }
+  .panel{padding:8px;gap:8px}
+  .form-card{padding:10px;gap:8px}
+
+  .card{padding:10px}
+  .kpi .n{font-size:22px}
+  .kpi .l{font-size:11px}
+
+  table.wire th, table.wire td{padding:4px 6px;font-size:13px}
+  .pill{font-size:11px;padding:0 8px}
+
+  .btn{font-size:15px;padding:4px 10px}
+  .btn.sm{font-size:13px;padding:2px 8px}
+  .seg-btn,.t-btn{font-size:16px;padding:4px 8px}
+
+  .tile{padding:8px;gap:6px}
+  .tile .icn{width:32px;height:32px;font-size:18px}
+  .tile .t-name{font-size:16px}
+
+  .mini-cards{gap:4px}
+  .mini-card{padding:3px 6px}
+  .mini-label{font-size:9px;margin-bottom:1px}
+  .mini-value{font-size:14px}
+
+  .chart-box{min-height:0}
+  .chart-title,.right-title{font-size:20px}
+  .chart-caption{font-size:10px}
+  .chart-legend{font-size:10px}
+
+  .row-h,.detail-row{grid-template-columns:50px 1fr 64px;gap:4px}
+  .row-h{font-size:9px;padding:0 2px 2px}
+  .rows{gap:3px}
+  .detail-row{padding:3px 4px}
+  .d-time{font-size:9px}
+  .d-title{font-size:11px;line-height:1.15}
+  .d-sub{font-size:9px;line-height:1.1}
+  .d-amt{font-size:13px}
+  .footer-note{font-size:8px}
+
+  /* analytics 專用: pager 更小 */
+  .pager{gap:3px}
+  .pager-label{font-size:9px}
+  .pager button{min-width:24px;font-size:11px;padding:2px 4px}
+
+  /* analytics 右側 panel 內部的 time-seg 和 seg-btn 手機下變小 */
+  .time-seg button{padding:3px 6px;font-size:13px;min-width:42px}
+  .seg-btn{font-size:14px;padding:4px 6px}
+
+  .fab{width:48px;height:48px;font-size:32px;right:12px;bottom:12px}
+
+  .toolbar{padding:8px 10px;gap:6px;margin-bottom:0}
+  .grid.g-3,.grid.g-4{grid-template-columns:repeat(3,1fr)}
+}
+
+/* phones in PORTRAIT: block with rotate hint */
+@media (orientation: portrait) and (max-width: 899px){
+  body::before{
+    content:"請將手機橫向旋轉 · Rotate to landscape";
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:var(--paper);z-index:9999;
+    font-family:'Caveat';font-size:30px;color:var(--ink);
+    padding:24px;text-align:center;line-height:1.4;
+  }
+  body::after{
+    content:"↻";
+    position:fixed;left:50%;top:calc(50% + 60px);transform:translateX(-50%);
+    font-size:80px;z-index:9999;color:var(--accent);
+    animation:rotateHint 2s ease-in-out infinite;
+  }
+  @keyframes rotateHint{
+    0%,100%{transform:translateX(-50%) rotate(0deg)}
+    50%{transform:translateX(-50%) rotate(90deg)}
+  }
+}

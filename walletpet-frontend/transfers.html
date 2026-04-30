@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WalletPet — Transfers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./shared.css">
+<style>
+  .tr-grid{
+    display:grid;grid-template-columns: minmax(280px, 360px) 1fr;gap:12px;
+    flex:1;min-height:0;
+  }
+  .tr-panel{
+    border:2px solid var(--ink);border-radius:14px;background:rgba(255,255,255,.22);
+    box-shadow:3px 3px 0 var(--ink);
+    display:flex;flex-direction:column;padding:12px;gap:10px;min-width:0;min-height:0;
+  }
+  /* form 是 flex column, 讓 form-spacer 能把按鈕推到底 */
+  .tr-panel > form{
+    display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;
+  }
+  .tr-history-host{gap:8px}
+  .tr-history-table-host{flex:1;min-height:0;border:2px dashed var(--ink);border-radius:12px;background:#fffaf2;padding:6px;overflow:auto}
+  /* 表格欄寬設定 (桌機手機共用, table-layout fixed 配合欄寬保持一行顯示) */
+  .tr-history-table-host table.wire{table-layout:fixed;width:100%}
+  .tr-history-table-host col.c-date{width:14%}
+  .tr-history-table-host col.c-from{width:22%}
+  .tr-history-table-host col.c-to{width:22%}
+  .tr-history-table-host col.c-note{width:20%}
+  .tr-history-table-host col.c-amt{width:22%}
+  .tr-history-table-host th, .tr-history-table-host td{
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  #transferError{color:var(--rose);font-family:'Kalam';font-size:13px;min-height:18px}
+
+  @media (max-width: 899px){
+    /* 手機: 左 form 窄 / 右 history 寬 (參考 transactions 比例) */
+    .tr-grid{grid-template-columns: minmax(180px, 240px) 1fr;gap:6px}
+    .tr-panel{padding:6px;gap:4px;min-height:0}
+    .tr-panel > form{
+      flex:1;min-height:0;
+      overflow-y:auto;    /* form 內部可捲 */
+      gap:4px;
+      display:flex;flex-direction:column;
+      position:relative;
+    }
+    /* form 最後一個 .row (按鈕組) sticky 在底部, 永遠可見 */
+    .tr-panel > form > .row:last-child{
+      position:sticky;bottom:0;
+      background:rgba(255,255,255,.95);
+      padding:4px 0;margin-top:auto;
+      z-index:2;
+    }
+    .tr-panel > form .form-spacer{display:none}  /* 手機不需要 spacer */
+    .tr-history-host{gap:4px}
+    .tr-history-host .toolbar{margin-bottom:0;padding:0}
+    .tr-history-host h3{font-size:13px}
+    .tr-history-table-host{padding:3px;font-size:10px}
+    .tr-history-table-host th{padding:2px 3px !important;font-size:9px}
+    .tr-history-table-host td{padding:2px 3px !important;font-size:10px}
+    /* 手機欄寬重調 */
+    .tr-history-table-host col.c-date{width:12%}
+    .tr-history-table-host col.c-from{width:24%}
+    .tr-history-table-host col.c-to{width:24%}
+    .tr-history-table-host col.c-note{width:15%}
+    .tr-history-table-host col.c-amt{width:25%}
+    label.field{margin-bottom:2px}
+    label.field span{font-size:11px}
+    .input{font-size:12px;padding:3px 6px}
+    .tr-panel h3{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+
+<main>
+  <h1 class="page-title" data-page="transfers">Transfers</h1>
+  <p class="page-sub">帳戶之間轉帳 · 資料表: account_transactions · API: POST /api/transfers</p>
+
+  <div class="tr-grid">
+    <!-- LEFT: transfer form -->
+    <section class="tr-panel">
+      <h3 style="margin:0">新增轉帳</h3>
+      <form id="transferForm" novalidate>
+        <label class="field">
+          <span>fromAccountId</span>
+          <select class="input" id="fromAccount" name="fromAccountId" required></select>
+        </label>
+        <label class="field">
+          <span>toAccountId</span>
+          <select class="input" id="toAccount" name="toAccountId" required></select>
+        </label>
+        <label class="field">
+          <span>transactionAmount</span>
+          <input class="input lg" id="trAmount" name="transactionAmount" type="number" min="0" step="0.01" placeholder="0" required/>
+        </label>
+        <label class="field">
+          <span>transactionDate</span>
+          <input class="input" id="trDate" name="transactionDate" type="date" required/>
+        </label>
+        <label class="field">
+          <span>note <small>(optional)</small></span>
+          <input class="input" id="trNote" name="note" placeholder="月存目標"/>
+        </label>
+        <div id="transferError" role="alert"></div>
+        <div class="form-spacer"></div>
+        <div class="row" style="gap:8px;margin-top:4px">
+          <button type="button" class="btn" id="trCancel" style="flex:1;justify-content:center">取消</button>
+          <button type="submit" class="btn primary" style="flex:1;justify-content:center">轉帳 →</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- RIGHT: Recent transfers -->
+    <section class="tr-panel tr-history-host">
+      <div class="toolbar" style="margin-bottom:0">
+        <h3 style="margin:0">Recent transfers</h3>
+        <span class="spacer"></span>
+        <input class="input" id="searchInput" placeholder="🔍 search note" style="max-width:180px"/>
+        <span id="transferCount" style="font-size:13px;color:var(--muted)">—</span>
+      </div>
+      <div class="tr-history-table-host">
+        <table class="wire">
+          <colgroup>
+            <col class="c-date"/>
+            <col class="c-from"/>
+            <col class="c-to"/>
+            <col class="c-note"/>
+            <col class="c-amt"/>
+          </colgroup>
+          <thead>
+            <tr>
+              <th>transactionDate</th>
+              <th>from_account</th>
+              <th>to_account</th>
+              <th>note</th>
+              <th style="text-align:right">transactionAmount</th>
+            </tr>
+          </thead>
+          <tbody id="transferBody">
+            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">讀取中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="wp-pager" id="transfersPager"></div>
+    </section>
+  </div>
+</main>
+
+<div data-wp-tweaks></div>
+
+<script src="./shared.js"></script>
+<script src="./api.js"></script>
+<script>
+/* ==============================================================
+   Transfers page — 串接 (規格 4.5 Transfer 模組):
+     GET /api/accounts                -> 帳戶下拉 + 餘額
+     POST /api/transfers              -> 新增轉帳
+     (規格未提供 list 端點,歷史列表暫時只走本地 demo,等規格補上)
+
+   TransferCreateRequest (對齊 SQL account_transactions):
+     {
+       fromAccountId:    Number,
+       toAccountId:      Number,
+       transactionAmount: Number,
+       transactionDate:   'yyyy-MM-dd',
+       note:               String?
+     }
+   ============================================================== */
+const fmt = WalletPet.format;
+
+const demoAccounts = [
+  { accountId: 1, accountName: '🏦 中信活存',   balance: 243060, currencyCode: 'TWD' },
+  { accountId: 3, accountName: '🏛 國泰高利存', balance: 336000, currencyCode: 'TWD' },
+  { accountId: 4, accountName: '💵 現金錢包',   balance:   8340, currencyCode: 'TWD' },
+];
+const demoTransfers = [
+  { accountTransId: 1,  transactionDate: '2026-04-18', fromAccountId: 1, toAccountId: 3, transactionAmount: 15000, note: '月存目標' },
+  { accountTransId: 2,  transactionDate: '2026-04-12', fromAccountId: 1, toAccountId: 4, transactionAmount:  3600, note: 'ATM 提款' },
+  { accountTransId: 3,  transactionDate: '2026-04-05', fromAccountId: 3, toAccountId: 1, transactionAmount: 18240, note: '帳戶調度' },
+  { accountTransId: 4,  transactionDate: '2026-03-30', fromAccountId: 3, toAccountId: 1, transactionAmount: 24000, note: '繳房租' },
+  { accountTransId: 5,  transactionDate: '2026-03-18', fromAccountId: 1, toAccountId: 3, transactionAmount: 15000, note: '月存目標' },
+  { accountTransId: 6,  transactionDate: '2026-03-12', fromAccountId: 1, toAccountId: 4, transactionAmount:  2000, note: '零用金' },
+  { accountTransId: 7,  transactionDate: '2026-03-05', fromAccountId: 3, toAccountId: 1, transactionAmount: 12500, note: '帳戶調度' },
+  { accountTransId: 8,  transactionDate: '2026-02-28', fromAccountId: 1, toAccountId: 3, transactionAmount: 20000, note: '年度儲蓄' },
+  { accountTransId: 9,  transactionDate: '2026-02-18', fromAccountId: 1, toAccountId: 3, transactionAmount: 15000, note: '月存目標' },
+  { accountTransId: 10, transactionDate: '2026-02-10', fromAccountId: 1, toAccountId: 4, transactionAmount:  4000, note: 'ATM 提款' },
+  { accountTransId: 11, transactionDate: '2026-02-05', fromAccountId: 3, toAccountId: 1, transactionAmount: 16800, note: '月度現金提領' },
+  { accountTransId: 12, transactionDate: '2026-01-28', fromAccountId: 1, toAccountId: 3, transactionAmount: 30000, note: '獎金存入' },
+  { accountTransId: 13, transactionDate: '2026-01-18', fromAccountId: 1, toAccountId: 3, transactionAmount: 15000, note: '月存目標' },
+  { accountTransId: 14, transactionDate: '2026-01-10', fromAccountId: 3, toAccountId: 1, transactionAmount:  9600, note: '緊急開銷' },
+  { accountTransId: 15, transactionDate: '2026-01-05', fromAccountId: 1, toAccountId: 4, transactionAmount:  3000, note: '過年紅包' },
+  { accountTransId: 16, transactionDate: '2025-12-28', fromAccountId: 3, toAccountId: 1, transactionAmount: 20000, note: '年終獎金分配' },
+  { accountTransId: 17, transactionDate: '2025-12-18', fromAccountId: 1, toAccountId: 3, transactionAmount: 15000, note: '月存目標' },
+  { accountTransId: 18, transactionDate: '2025-12-05', fromAccountId: 3, toAccountId: 1, transactionAmount: 14200, note: '帳戶調度' },
+];
+
+const state = { accounts: [], transfers: [], filter: '' };
+const pager = WalletPet.createPager({ pageSize: 8 });
+function adjustPagerSize() {
+  pager.pageSize = window.matchMedia('(max-width: 899px)').matches ? 4 : 5;
+}
+adjustPagerSize();
+window.addEventListener('resize', () => { adjustPagerSize(); renderHistory(); });
+
+function accountById(id) { return state.accounts.find(a => a.accountId === Number(id)); }
+
+function populateAccounts() {
+  const optsFrom = state.accounts.map(a => `<option value="${a.accountId}">${a.accountName} — ${fmt.money(a.balance, a.currencyCode)}</option>`).join('');
+  document.getElementById('fromAccount').innerHTML = optsFrom;
+  document.getElementById('toAccount').innerHTML = optsFrom;
+  // 確保預設 from 和 to 不同
+  if (state.accounts.length >= 2) {
+    document.getElementById('toAccount').selectedIndex = 1;
+  }
+  updatePreview();
+}
+
+function updatePreview() {
+  const fromId = Number(document.getElementById('fromAccount').value);
+  const toId   = Number(document.getElementById('toAccount').value);
+
+  // 處理 from == to 的錯誤
+  const err = document.getElementById('transferError');
+  if (fromId && toId && fromId === toId) {
+    err.textContent = '⚠ fromAccountId 不可等於 toAccountId';
+  } else {
+    err.textContent = '';
+  }
+}
+
+function renderHistory() {
+  const q = state.filter.toLowerCase();
+  const filtered = state.transfers
+    .filter(t => !q || (t.note || '').toLowerCase().includes(q));
+
+  pager.setItems(filtered);
+  const visible = pager.visible();
+
+  const rows = visible.map(t => {
+    const from = accountById(t.fromAccountId);
+    const to   = accountById(t.toAccountId);
+    return `<tr data-transfer-id="${t.accountTransId}">
+      <td>${fmt.date(t.transactionDate)}</td>
+      <td>${from ? from.accountName : ('#' + t.fromAccountId)}</td>
+      <td>${to   ? to.accountName   : ('#' + t.toAccountId)}</td>
+      <td>${t.note || '—'}</td>
+      <td style="text-align:right">${fmt.money(t.transactionAmount)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('transferBody').innerHTML = rows ||
+    '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">無符合條件的轉帳紀錄</td></tr>';
+  document.getElementById('transferCount').textContent = state.transfers.length + ' 筆轉帳';
+
+  pager.renderInto('transfersPager', renderHistory);
+}
+
+/* ---- events ---- */
+['fromAccount', 'toAccount', 'trAmount'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePreview);
+  document.getElementById(id).addEventListener('change', updatePreview);
+});
+document.getElementById('searchInput').addEventListener('input', e => {
+  state.filter = e.target.value; pager.goTo(1); renderHistory();
+});
+
+document.getElementById('transferForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('transferError');
+  err.textContent = '';
+
+  const body = {
+    fromAccountId:    Number(document.getElementById('fromAccount').value),
+    toAccountId:      Number(document.getElementById('toAccount').value),
+    transactionAmount: Number(document.getElementById('trAmount').value),
+    transactionDate:   document.getElementById('trDate').value,
+    note:               document.getElementById('trNote').value || null,
+  };
+
+  if (body.fromAccountId === body.toAccountId) {
+    err.textContent = 'fromAccountId 與 toAccountId 不可相同';
+    return;
+  }
+  if (!body.transactionAmount || body.transactionAmount <= 0) {
+    err.textContent = 'transactionAmount 必須 > 0';
+    return;
+  }
+
+  try {
+    await WalletPet.transferApi.create(body);
+    // 重讀整個 list 而非 unshift(created):拿 server-authoritative 排序 + 完整欄位
+    // (accountTransId / createdAt 由後端配),避免前後端狀態漂移
+    state.transfers = await WalletPet.transferApi.list();
+  } catch (ex) {
+    console.warn('[transfers] API 失敗,走本地模擬 unshift');
+    state.transfers.unshift({ accountTransId: 'local_' + Date.now(), ...body });
+  }
+  renderHistory();
+  e.target.reset();
+  document.getElementById('trDate').value = fmt.today();
+  populateAccounts();    // 重新抓餘額
+});
+
+document.getElementById('trCancel').addEventListener('click', () => {
+  document.getElementById('transferForm').reset();
+  document.getElementById('trDate').value = fmt.today();
+  updatePreview();
+});
+
+/* ---- init ---- */
+async function init() {
+  document.getElementById('trDate').value = fmt.today();
+
+  try { state.accounts  = await WalletPet.accountApi.list(); }
+  catch { state.accounts  = demoAccounts; }
+
+  // ADR 0001 (Option B): 規格 4.5 補一隻 GET /api/transfers,串通後 demoTransfers 變 fallback。
+  // 後端尚未實作前 catch 分支保持 demo 可跑;後端做完前端 0 改動自動切換到真資料。
+  try { state.transfers = await WalletPet.transferApi.list(); }
+  catch { state.transfers = demoTransfers; }
+
+  populateAccounts();
+  renderHistory();
+}
+init();
+</script>
+</body>
+</html>

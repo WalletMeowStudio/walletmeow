@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WalletPet — Categories</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./shared.css">
+<style>
+  /* 左 form + 右側 (tile 上 / table 下) */
+  .cat-grid{
+    display:grid;grid-template-columns: minmax(280px, 360px) 1fr;gap:12px;
+    flex:1;min-height:0;
+  }
+  .cat-panel{
+    border:2px solid var(--ink);border-radius:14px;background:rgba(255,255,255,.22);
+    box-shadow:3px 3px 0 var(--ink);
+    display:flex;flex-direction:column;padding:12px;gap:10px;min-width:0;min-height:0;
+  }
+  .cat-panel > form{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow:auto}
+  /* 右側上下分 */
+  .cat-right{
+    display:flex;flex-direction:column;gap:12px;
+    min-width:0;min-height:0;
+  }
+  .cat-section{
+    border:2px solid var(--ink);border-radius:14px;background:rgba(255,255,255,.22);
+    box-shadow:3px 3px 0 var(--ink);
+    display:flex;flex-direction:column;padding:12px;gap:8px;min-width:0;min-height:0;
+  }
+  .cat-tiles-section{flex:1 1 0}
+  .cat-table-section{flex:1 1 0}
+
+  /* Tile grid — 每格固定大小, 少時靠左對齊不拉寬 */
+  .tile-grid{
+    flex:1;min-height:0;
+    display:grid;grid-template-columns:repeat(auto-fill, 100px);gap:8px;
+    grid-auto-rows:84px;    /* 固定每列高度,跨 tab 大小一致 */
+    overflow:auto;padding:4px;align-content:start;justify-content:start;
+  }
+  /* categories 頁的 tile 改垂直排列(icon上/名字下),覆蓋 shared.css 預設水平 */
+  .tile-grid .tile{
+    flex-direction:column;gap:6px;padding:8px;
+    cursor:pointer;transition:transform .08s;
+    text-align:center;
+  }
+  .tile-grid .tile .icn{width:36px;height:36px;font-size:18px}
+  .tile-grid .tile .t-name{
+    font-size:16px;line-height:1.1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    max-width:100%;
+  }
+  .tile-grid .tile:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .tile-grid .tile.selected{
+    background:var(--accent-soft) !important;
+    box-shadow:4px 4px 0 var(--accent);
+    outline:2px solid var(--accent);
+  }
+  /* 新增用 tile (+ add) */
+  .tile-grid .tile-add{
+    border:2px dashed var(--ink-soft);background:transparent;
+    color:var(--ink-soft);box-shadow:none;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Caveat';font-size:22px;cursor:pointer;
+  }
+  .tile-grid .tile-add:hover{
+    border-color:var(--accent);color:var(--accent);
+    background:rgba(232,100,58,.06);
+    transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--accent);
+  }
+
+  /* Table */
+  .cat-table-host{
+    flex:1;min-height:0;border:2px dashed var(--ink);border-radius:12px;
+    background:#fffaf2;padding:6px;overflow:auto;
+  }
+  .cat-table-host table.wire{table-layout:fixed;width:100%}
+  .cat-table-host col.c-name { width: 30%; }
+  .cat-table-host col.c-icon { width: 15%; }
+  .cat-table-host col.c-color{ width: 25%; }
+  .cat-table-host col.c-sys  { width: 15%; }
+  .cat-table-host col.c-dis  { width: 15%; }
+  .cat-table-host th:nth-child(n+2), .cat-table-host td:nth-child(n+2){text-align:center}
+  .cat-table-host tbody tr{cursor:pointer}
+  .cat-table-host tbody tr:hover td{background:rgba(232,100,58,.08)}
+  .cat-table-host tbody tr.selected td{background:var(--accent-soft)}
+
+  /* th 內部文字: 桌機顯示 full, 手機顯示 short (替代舊的 data-short hack) */
+  .cat-table-host .th-short{display:none}
+  .cat-table-host .th-full{display:inline}
+
+  /* name 欄的 3 個子元素: 色條 + emoji + 文字 (inline 排列, 不用 flex 避免破壞 table) */
+  .cat-table-host .cat-bar{
+    display:inline-block;width:4px;height:18px;border-radius:2px;
+    vertical-align:middle;margin-right:6px;
+  }
+  .cat-table-host .cat-emoji{
+    display:inline-block;font-size:16px;line-height:1;
+    vertical-align:middle;margin-right:6px;
+  }
+  .cat-table-host .cat-label{
+    vertical-align:middle;
+  }
+
+  /* color swatch */
+  .sw-inline{
+    display:inline-block;width:18px;height:18px;border:1.5px solid var(--ink);
+    border-radius:4px;vertical-align:middle;
+  }
+
+  /* 紅色刪除按鈕 */
+  .btn.danger{
+    background:#fff;color:var(--rose);border-color:var(--rose);
+    box-shadow:2px 2px 0 var(--rose);
+  }
+  .btn.danger:hover{background:#ffe5e5}
+
+  /* flag checkboxes */
+  .flag-row{
+    display:flex;gap:8px;flex-wrap:wrap;
+    font-family:'Kalam';font-size:13px;
+  }
+  .flag-row label{
+    display:flex;align-items:center;gap:6px;cursor:pointer;
+    padding:4px 10px;border:1.5px solid var(--ink-soft);border-radius:8px;
+    background:#fff;
+  }
+  .flag-row label:has(input:checked){
+    background:var(--accent-soft);border-color:var(--accent);
+  }
+  .flag-row input[type="checkbox"]{accent-color:var(--accent)}
+
+  /* icon picker — 分頁式(無捲軸), 搭配左右翻頁按鈕 */
+  .icon-current{
+    display:flex;align-items:center;gap:8px;
+    padding:6px 10px;
+    border:1.5px solid var(--ink);border-radius:8px;
+    background:#fff;
+    font-family:'Kalam';font-size:12px;color:var(--muted);
+    min-height:40px;
+  }
+  .icon-current .ic-display{
+    font-size:22px;line-height:1;
+    width:32px;height:32px;display:grid;place-items:center;
+    background:var(--accent-soft);border-radius:6px;
+  }
+  /* picker-wrap: 內含 pager 按鈕 + icon grid */
+  .picker-wrap{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    gap:4px;align-items:stretch;
+    margin-top:6px;
+  }
+  .picker-wrap .pg-btn{
+    border:1.5px solid var(--ink);background:#fff;border-radius:8px;
+    font-family:'Caveat';font-size:20px;cursor:pointer;
+    padding:0 6px;box-shadow:2px 2px 0 var(--ink);
+    display:grid;place-items:center;
+  }
+  .picker-wrap .pg-btn:hover:not(:disabled){transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+  .picker-wrap .pg-btn:disabled{opacity:.3;cursor:not-allowed;box-shadow:1px 1px 0 var(--ink)}
+  .icon-picker{
+    display:grid;
+    grid-template-columns:repeat(10, 1fr);
+    grid-auto-rows:28px;gap:3px;padding:6px;
+    border:1.5px dashed var(--ink-soft);border-radius:8px;
+    background:#fffaf2;
+    /* 固定顯示 2 列,不捲動 */
+    overflow:hidden;
+  }
+  .icon-picker button{
+    border:1.5px solid transparent;border-radius:6px;
+    background:#fff;cursor:pointer;
+    font-size:16px;padding:0;line-height:1;
+    display:grid;place-items:center;
+  }
+  .icon-picker button:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .icon-picker button.selected{
+    border-color:var(--accent);background:var(--accent-soft);
+    box-shadow:inset 0 0 0 2px var(--accent);
+  }
+  .picker-info{
+    text-align:center;font-family:'Kalam';font-size:10px;color:var(--muted);
+    margin-top:2px;
+  }
+
+  /* color picker — 分頁式,同樣結構 */
+  .color-current{
+    display:flex;align-items:center;gap:8px;
+    padding:4px 8px 4px 4px;
+    border:1.5px solid var(--ink);border-radius:8px;
+    background:#fff;
+  }
+  .color-current .cc-swatch{
+    width:32px;height:32px;border-radius:6px;border:1.5px solid var(--ink-soft);
+    flex-shrink:0;
+  }
+  .color-current .cc-code{
+    flex:1;font-family:'Kalam';font-size:12px;color:var(--muted);
+    border:none;background:transparent;outline:none;min-width:0;
+  }
+  .color-palette{
+    display:grid;
+    grid-template-columns:repeat(8, 1fr);
+    grid-auto-rows:24px;gap:3px;
+    padding:4px;
+    border:1.5px dashed var(--ink-soft);border-radius:8px;
+    background:#fffaf2;
+    overflow:hidden;
+  }
+  .color-palette button{
+    border:2px solid transparent;border-radius:6px;
+    cursor:pointer;padding:0;
+    position:relative;
+  }
+  .color-palette button:hover{transform:translate(-1px,-1px);box-shadow:2px 2px 0 var(--ink)}
+  .color-palette button.selected::after{
+    content:'✓';position:absolute;inset:0;
+    display:grid;place-items:center;
+    color:#fff;font-size:12px;font-weight:700;
+    text-shadow:0 0 2px rgba(0,0,0,.6);
+  }
+
+  @media (max-width: 899px){
+    /* 手機版: 保留左右版型, 讓內容緊湊塞進一頁 */
+    .cat-grid{
+      grid-template-columns: minmax(180px, 240px) 1fr;
+      gap:6px;
+      flex:1;min-height:0;
+    }
+    .cat-panel, .cat-section{padding:6px;gap:4px;min-height:0}
+    .cat-panel > form{overflow-y:auto;min-height:0;gap:6px;position:relative}
+    /* form 最後一個 .row (按鈕組) sticky 在底部 */
+    .cat-panel > form > .row:last-child{
+      position:sticky;bottom:0;
+      background:rgba(255,255,255,.95);
+      padding:4px 0;margin-top:auto;
+      z-index:2;
+    }
+    .cat-panel > form .form-spacer{display:none}
+    /* 手機版: 隱藏 icon/color 標題的括號說明 + 「目前選用」/色碼欄位 */
+    .cat-panel > form label.field > span > small,
+    .cat-panel > form .field > span > small{display:none}
+    .cat-panel > form .icon-current,
+    .cat-panel > form .color-current{display:none}
+    .cat-right{gap:6px}
+
+    /* 手機下 tiles 區塊: 2 列 9 欄大網格; details 區塊只顯示 1 筆高度即可 */
+    .cat-tiles-section{
+      flex:1 1 0;min-height:0;
+      padding:3px 6px;gap:2px;
+    }
+    .cat-tiles-section h3{font-size:11px;margin:0;line-height:1}
+    .cat-tiles-section > .row{margin:0;line-height:1}
+    .cat-tiles-section > .row small{font-size:9px}
+    .cat-table-section{flex:0 0 auto;min-height:0;padding:3px 6px;gap:2px}
+    .cat-table-section h3{font-size:11px;margin:0;line-height:1}
+    /* 手機下 Details 只顯示 1 筆, 高度自動 (不 flex:1 避免撐高) */
+    .cat-table-section .cat-table-host{flex:0 0 auto;padding:3px}
+    /* tile-grid 2 列 9 欄 = 18 格 (含 +新增 17 筆分類) */
+    .tile-grid{
+      grid-template-columns:repeat(9, 1fr);
+      grid-auto-rows:46px;gap:2px;
+      max-height:94px;overflow:hidden;
+      padding:1px;
+    }
+    .tile-grid .tile{padding:2px;gap:1px}
+    .tile-grid .tile .icn{width:22px;height:22px;font-size:14px}
+    .tile-grid .tile .t-name{font-size:12px;line-height:1;font-weight:700}
+    /* +新增 tile 字縮小避免在小 tile 內折行擠壓 */
+    .tile-grid .tile-add{font-size:11px;line-height:1.1;padding:1px;font-weight:700}
+    /* tiles 的 pager 也要壓小 */
+    .cat-tiles-section .wp-pager{padding:1px 0}
+    .cat-tiles-section .wp-pager button{padding:1px 5px;font-size:10px;min-width:18px}
+    /* table pager 也壓小 */
+    .cat-table-section .wp-pager{padding:1px 0}
+    .cat-table-section .wp-pager button{padding:1px 5px;font-size:10px;min-width:18px}
+    label.field{margin-bottom:2px}
+    label.field span{font-size:11px;margin-bottom:0}
+    .input{font-size:12px;padding:3px 6px}
+    .cat-panel h3{font-size:14px}       /* left form title 保持可讀 */
+    /* cat-section 的 h3 已在 tiles-section/table-section 各自設 12px, 這裡不再覆蓋 */
+
+    /* 手機版 picker: 一次 2 個 icon/color, 左右按鈕切換 */
+    .icon-picker{
+      grid-template-columns:1fr 1fr;
+      grid-auto-rows:32px;
+      gap:3px;padding:3px;
+    }
+    .icon-picker button{font-size:18px}
+    .icon-current{padding:2px 6px;min-height:28px;font-size:10px;gap:4px}
+    .icon-current .ic-display{width:20px;height:20px;font-size:13px}
+
+    .color-palette{
+      grid-template-columns:1fr 1fr;
+      grid-auto-rows:24px;
+      gap:3px;padding:3px;
+    }
+    .color-current{padding:2px 4px 2px 2px}
+    .color-current .cc-swatch{width:20px;height:20px}
+    .color-current .cc-code{font-size:10px}
+    .picker-wrap{gap:2px}
+    .picker-wrap .pg-btn{font-size:13px;padding:0 4px}
+    .picker-info{font-size:9px}
+
+    /* Details 表格: 手機保留全部 5 欄 (Details 現在只顯示 1 筆,空間夠) */
+    .cat-table-host col.c-name  { width: 30%; }
+    .cat-table-host col.c-icon  { width: 12%; }
+    .cat-table-host col.c-color { width: 24%; }
+    .cat-table-host col.c-sys   { width: 17%; }
+    .cat-table-host col.c-dis   { width: 17%; }
+    .cat-table-host{padding:3px;font-size:11px}
+    .cat-table-host table.wire{table-layout:fixed;width:100%}
+    .cat-table-host th{
+      padding:2px 3px !important;font-size:10px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .cat-table-host td{
+      padding:4px 3px !important;font-size:11px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    /* 手機下 thead 切換短文字 */
+    .cat-table-host .th-full{display:none}
+    .cat-table-host .th-short{display:inline}
+    /* name 欄的色條和 emoji 手機縮小 */
+    .cat-table-host .cat-bar{width:3px;height:14px;margin-right:4px}
+    .cat-table-host .cat-emoji{font-size:13px;margin-right:4px}
+  }
+</style>
+</head>
+<body>
+
+
+<main>
+  <h1 class="page-title" data-page="categories">Categories <span class="count" id="catCount">—</span></h1>
+  <p class="page-sub">管理支出／收入分類 · 資料表: categories · API: /api/categories</p>
+
+  <div class="toolbar">
+    <div class="seg" style="max-width:260px">
+      <button class="seg-btn active" data-type="EXPENSE">EXPENSE</button>
+      <button class="seg-btn" data-type="INCOME">INCOME</button>
+    </div>
+    <input class="input" id="searchInput" placeholder="🔍 search category" style="max-width:220px"/>
+  </div>
+
+  <div class="cat-grid">
+    <!-- LEFT: form (new / edit) -->
+    <section class="cat-panel">
+      <h3 style="margin:0" id="catFormTitle">New category</h3>
+      <form id="catForm" novalidate>
+        <label class="field">
+          <span>categoryName</span>
+          <input class="input" id="catName" name="categoryName" placeholder="e.g. 飲食" required maxlength="45"/>
+        </label>
+        <div class="field">
+          <span>icon <small>(點選圖示)</small></span>
+          <div class="icon-current">
+            <span class="ic-display" id="iconDisplay">📦</span>
+            <span>目前選用</span>
+            <span style="font-family:'Kalam';font-size:13px;color:var(--ink);" id="iconLabel">📦</span>
+          </div>
+          <!-- 隱藏的 input 給 form submit 用 -->
+          <input type="hidden" id="catIcon" name="icon" value="📦"/>
+          <div class="picker-wrap">
+            <button type="button" class="pg-btn" id="iconPrevBtn" aria-label="上一頁 icon">‹</button>
+            <div class="icon-picker" id="iconPicker"></div>
+            <button type="button" class="pg-btn" id="iconNextBtn" aria-label="下一頁 icon">›</button>
+          </div>
+          <div class="picker-info" id="iconPickerInfo">—</div>
+        </div>
+        <div class="field">
+          <span>color <small>(點選色塊)</small></span>
+          <div class="color-current">
+            <span class="cc-swatch" id="colorSwatch" style="background:#FF9F43"></span>
+            <input type="text" class="cc-code" id="catColor" name="color" value="#FF9F43" maxlength="7" placeholder="#FF9F43"/>
+          </div>
+          <div class="picker-wrap">
+            <button type="button" class="pg-btn" id="colorPrevBtn" aria-label="上一頁 color">‹</button>
+            <div class="color-palette" id="colorPalette"></div>
+            <button type="button" class="pg-btn" id="colorNextBtn" aria-label="下一頁 color">›</button>
+          </div>
+          <div class="picker-info" id="colorPickerInfo">—</div>
+        </div>
+        <div class="field">
+          <span>flags</span>
+          <div class="flag-row">
+            <label><input type="checkbox" id="catDisabled" name="isDisable"/> isDisable</label>
+          </div>
+          <small style="font-family:'Kalam';font-size:11px;color:var(--muted);margin-top:2px">
+            isSystem 由後端判定 · categoryType 由上方 EXPENSE/INCOME 決定
+          </small>
+        </div>
+
+        <div class="form-spacer"></div>
+        <div class="row" style="gap:8px;margin-top:4px">
+          <button type="button" class="btn danger" id="catDeleteBtn" style="display:none;justify-content:center;padding:6px 12px">🗑 Delete</button>
+          <button type="button" class="btn" id="catCancelBtn" style="flex:1;justify-content:center">Clear</button>
+          <button type="submit" class="btn primary" id="catSubmitBtn" style="flex:1;justify-content:center">Save category</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- RIGHT: tile grid (top) + table (bottom) -->
+    <div class="cat-right">
+      <section class="cat-section cat-tiles-section">
+        <div class="row" style="justify-content:space-between;align-items:baseline">
+          <h3 style="margin:0">Tiles</h3>
+          <small style="font-family:'Kalam';font-size:11px;color:var(--muted)">點選 tile 可編輯</small>
+        </div>
+        <div class="tile-grid" id="tileGrid"></div>
+        <div class="wp-pager" id="tilePager"></div>
+      </section>
+
+      <section class="cat-section cat-table-section">
+        <h3 style="margin:0">Details</h3>
+        <div class="cat-table-host">
+          <table class="wire">
+            <colgroup>
+              <col class="c-name"/>
+              <col class="c-icon"/>
+              <col class="c-color"/>
+              <col class="c-sys"/>
+              <col class="c-dis"/>
+            </colgroup>
+            <thead>
+              <tr>
+                <th><span class="th-full">categoryName</span><span class="th-short">name</span></th>
+                <th>icon</th>
+                <th>color</th>
+                <th><span class="th-full">isSystem</span><span class="th-short">sys</span></th>
+                <th><span class="th-full">isDisable</span><span class="th-short">dis</span></th>
+              </tr>
+            </thead>
+            <tbody id="catTableBody">
+              <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">讀取中…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="wp-pager" id="tablePager"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<div data-wp-tweaks></div>
+
+<script src="./shared.js"></script>
+<script src="./api.js"></script>
+<script>
+/* ==============================================================
+   Categories page
+   CategoryResponse (對齊 SQL categories):
+     { categoryId, userId, categoryName, categoryType,
+       icon, color, isSystem, isDisable, createdAt }
+   ============================================================== */
+
+const demoCategories = [
+  { categoryId: 'ES001', categoryName: '飲食',    categoryType: 'EXPENSE', icon: '🍜', color: '#FF9F43', isSystem: true,  isDisable: false },
+  { categoryId: 'ES002', categoryName: '衣飾',    categoryType: 'EXPENSE', icon: '👕', color: '#A29BFE', isSystem: true,  isDisable: false },
+  { categoryId: 'ES003', categoryName: '住宅',    categoryType: 'EXPENSE', icon: '🏠', color: '#c98a55', isSystem: true,  isDisable: false },
+  { categoryId: 'ES004', categoryName: '交通',    categoryType: 'EXPENSE', icon: '🚇', color: '#4a7bb7', isSystem: true,  isDisable: false },
+  { categoryId: 'ES005', categoryName: '娛樂',    categoryType: 'EXPENSE', icon: '🎬', color: '#e8c55a', isSystem: true,  isDisable: false },
+  { categoryId: 'ES006', categoryName: '水電',    categoryType: 'EXPENSE', icon: '💡', color: '#e8a63a', isSystem: true,  isDisable: false },
+  { categoryId: 'ES007', categoryName: '其他',    categoryType: 'EXPENSE', icon: '📦', color: '#888888', isSystem: true,  isDisable: false },
+  { categoryId: 'ES008', categoryName: '醫療',    categoryType: 'EXPENSE', icon: '🏥', color: '#d76565', isSystem: true,  isDisable: false },
+  { categoryId: 'ES009', categoryName: '教育',    categoryType: 'EXPENSE', icon: '📚', color: '#5d7ce2', isSystem: true,  isDisable: false },
+  { categoryId: 'ES010', categoryName: '寵物',    categoryType: 'EXPENSE', icon: '🐱', color: '#ffb88c', isSystem: false, isDisable: false },
+  { categoryId: 'ES011', categoryName: '保險',    categoryType: 'EXPENSE', icon: '🛡', color: '#4a90a4', isSystem: true,  isDisable: false },
+  { categoryId: 'ES012', categoryName: '運動',    categoryType: 'EXPENSE', icon: '🏀', color: '#f5a623', isSystem: false, isDisable: false },
+  { categoryId: 'ES013', categoryName: '旅遊',    categoryType: 'EXPENSE', icon: '✈️', color: '#7ed321', isSystem: false, isDisable: false },
+  { categoryId: 'ES014', categoryName: '3C 設備', categoryType: 'EXPENSE', icon: '📱', color: '#9013fe', isSystem: false, isDisable: false },
+  { categoryId: 'ES015', categoryName: '禮物',    categoryType: 'EXPENSE', icon: '🎁', color: '#d0021b', isSystem: false, isDisable: false },
+  { categoryId: 'ES016', categoryName: '訂閱',    categoryType: 'EXPENSE', icon: '💳', color: '#9b9b9b', isSystem: false, isDisable: false },
+  { categoryId: 'IS001', categoryName: '薪水',    categoryType: 'INCOME',  icon: '💰', color: '#2ECC71', isSystem: true,  isDisable: false },
+  { categoryId: 'IS002', categoryName: '投資',    categoryType: 'INCOME',  icon: '📈', color: '#3498DB', isSystem: true,  isDisable: false },
+  { categoryId: 'IS003', categoryName: '獎金',    categoryType: 'INCOME',  icon: '🎁', color: '#6aa35d', isSystem: false, isDisable: false },
+  { categoryId: 'IS004', categoryName: '兼職',    categoryType: 'INCOME',  icon: '💼', color: '#f39c12', isSystem: false, isDisable: false },
+  { categoryId: 'IS005', categoryName: '退稅',    categoryType: 'INCOME',  icon: '🧾', color: '#16a085', isSystem: false, isDisable: false },
+  { categoryId: 'IS006', categoryName: '利息',    categoryType: 'INCOME',  icon: '🏦', color: '#27ae60', isSystem: true,  isDisable: false },
+  { categoryId: 'IS007', categoryName: '紅包',    categoryType: 'INCOME',  icon: '🧧', color: '#e74c3c', isSystem: false, isDisable: false },
+  { categoryId: 'IS008', categoryName: '其他收入', categoryType: 'INCOME', icon: '💵', color: '#95a5a6', isSystem: true,  isDisable: false },
+];
+
+/* 完整 icon palette - EXPENSE / INCOME 分兩套, 覆蓋常見類別 */
+const ICON_PALETTE = {
+  EXPENSE: [
+    // 飲食
+    '🍜','🍱','☕','🍔','🍕','🍣','🥗','🍺','🍷','🧋',
+    // 衣飾
+    '👕','👔','👗','👟','👜','🎒',
+    // 住宅
+    '🏠','🛋','🛏','🧹','🔧','🪴',
+    // 交通
+    '🚇','🚗','⛽','🚕','✈️','🚲','🛵',
+    // 娛樂
+    '🎬','🎮','🎵','📺','🎤','📷','🎨','⚽','🏀','🎣',
+    // 水電/通訊
+    '💡','💧','📱','📶','📡','🔌',
+    // 醫療/保健
+    '🏥','💊','🩺','😷','🧴',
+    // 教育
+    '📚','✏️','🎓','📝','🖥',
+    // 生活/日用
+    '🛒','🧺','🧻','🪥','🛍','💳','🎁','💐',
+    // 寵物/其他
+    '🐱','🐶','🐾','📦','💼','🧾',
+  ],
+  INCOME: [
+    '💰','💵','💴','💶','💷','🪙',
+    '📈','📊','💹','🏦',
+    '💼','🎁','🧧','🏆','🎯','💸',
+    '🧾','💳','🪝','📝',
+  ],
+};
+
+/* color palette - 32 個預設色 (4 列 × 8 格) */
+const COLOR_PALETTE = [
+  // 暖色
+  '#FF6B6B','#FF9F43','#FDCB6E','#F39C12','#E67E22','#D35400','#C0392B','#E74C3C',
+  // 冷色
+  '#4ECDC4','#45B7D1','#3498DB','#5D7CE2','#6C5CE7','#A29BFE','#9013FE','#8E44AD',
+  // 綠色
+  '#2ECC71','#6AA35D','#27AE60','#16A085','#1ABC9C','#7ED321','#55EFC4','#00B894',
+  // 中性/暖棕
+  '#636E72','#888888','#95A5A6','#C98A55','#D7A07D','#FFB88C','#FFE5B4','#34495E',
+];
+
+const state = {
+  type: 'EXPENSE',
+  filter: '',
+  categories: [],
+  editingCategoryId: null,
+};
+
+const tilePager  = WalletPet.createPager({ pageSize: 20 });   // 桌機夠大,不分頁
+const tablePager = WalletPet.createPager({ pageSize: 6 });
+function adjustPagerSize() {
+  const small = window.matchMedia('(max-width: 899px)').matches;
+  tilePager.pageSize  = small ? 17 : 20;    // 手機 2列9欄=18格(+新增=17筆)
+  tablePager.pageSize = small ? 2 : 6;
+}
+adjustPagerSize();
+window.addEventListener('resize', () => {
+  adjustPagerSize(); renderTiles(); renderTable();
+});
+
+function visible() {
+  const q = state.filter.toLowerCase();
+  return state.categories
+    .filter(c => c.categoryType === state.type)
+    .filter(c => !q || c.categoryName.toLowerCase().includes(q));
+}
+
+/* ---------- 渲染 ---------- */
+function renderTiles() {
+  const all = visible();
+  tilePager.setItems(all);
+  const list = tilePager.visible();
+  const tiles = list.map(c => {
+    const sel = c.categoryId === state.editingCategoryId ? ' selected' : '';
+    return `<div class="tile${sel}" data-category-id="${c.categoryId}" style="border-color:${c.color || 'var(--ink)'}">
+      <div class="icn" style="background:${c.color ? c.color + '33' : 'var(--accent-soft)'}">${c.icon || '📦'}</div>
+      <div class="t-name">${c.categoryName}</div>
+    </div>`;
+  }).join('');
+
+  // +新增 tile: 永遠在第一頁最左邊顯示,這樣使用者一眼就看到新增入口
+  const isFirstPage = tilePager.current === 1;
+  const addTile = isFirstPage
+    ? `<div class="tile tile-add" id="addCategoryTile" title="新增一筆 ${state.type} 分類">+ 新增</div>`
+    : '';
+
+  document.getElementById('tileGrid').innerHTML = (addTile + tiles) ||
+    `<div class="tile tile-add" id="addCategoryTile">+ 新增第一筆</div>`;
+  tilePager.renderInto('tilePager', renderTiles, { alwaysShow: true });
+}
+
+function renderTable() {
+  const isMobile = window.matchMedia('(max-width: 899px)').matches;
+
+  // 手機模式: 只顯示當前選中那筆, 不分頁
+  if (isMobile) {
+    document.getElementById('catCount').textContent =
+      state.categories.filter(c => c.categoryType === state.type).length + ' ' + state.type.toLowerCase();
+    // pager 區塊清空
+    document.getElementById('tablePager').innerHTML = '';
+
+    const editing = state.editingCategoryId
+      ? state.categories.find(c => c.categoryId === state.editingCategoryId)
+      : null;
+
+    if (!editing) {
+      // 初始 / 新增模式: 空白提示
+      document.getElementById('catTableBody').innerHTML =
+        `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px;font-size:11px">
+          請點選上方 tile 查看詳情
+        </td></tr>`;
+      return;
+    }
+
+    // 顯示該筆 (同桌機 row 格式)
+    const c = editing;
+    document.getElementById('catTableBody').innerHTML = `
+      <tr class="selected" data-category-id="${c.categoryId}">
+        <td>
+          <span class="cat-bar" style="background:${c.color || '#888'}"></span>
+          <span class="cat-emoji">${c.icon || '📦'}</span>
+          <span class="cat-label">${c.categoryName}</span>
+        </td>
+        <td>${c.icon || '—'}</td>
+        <td><span class="sw-inline" style="background:${c.color || '#888'}"></span> <small style="font-family:'Kalam';font-size:11px">${c.color || ''}</small></td>
+        <td>${c.isSystem}</td>
+        <td>${c.isDisable}</td>
+      </tr>`;
+    return;
+  }
+
+  // 桌機模式: 正常分頁列表
+  const all = visible();
+  tablePager.setItems(all);
+  const list = tablePager.visible();
+  const rows = list.map(c => {
+    const sel = c.categoryId === state.editingCategoryId ? ' class="selected"' : '';
+    return `<tr${sel} data-category-id="${c.categoryId}">
+      <td>
+        <span class="cat-bar" style="background:${c.color || '#888'}"></span>
+        <span class="cat-emoji">${c.icon || '📦'}</span>
+        <span class="cat-label">${c.categoryName}</span>
+      </td>
+      <td>${c.icon || '—'}</td>
+      <td><span class="sw-inline" style="background:${c.color || '#888'}"></span> <small style="font-family:'Kalam';font-size:11px">${c.color || ''}</small></td>
+      <td>${c.isSystem}</td>
+      <td>${c.isDisable}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('catTableBody').innerHTML = rows ||
+    '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">無符合條件的分類</td></tr>';
+  document.getElementById('catCount').textContent =
+    state.categories.filter(c => c.categoryType === state.type).length + ' ' + state.type.toLowerCase();
+  tablePager.renderInto('tablePager', renderTable);
+}
+
+function render() { renderTiles(); renderTable(); }
+
+/* ---------- icon picker (分頁式) ---------- */
+const pickerState = {
+  iconPage: 0,
+  colorPage: 0,
+};
+
+function getIconPageSize() {
+  return window.matchMedia('(max-width: 899px)').matches ? 2 : 20;   // 手機一次 2 個 / 桌機 10x2=20
+}
+function getColorPageSize() {
+  return window.matchMedia('(max-width: 899px)').matches ? 2 : 16;   // 手機一次 2 個 / 桌機 8x2=16
+}
+
+function renderIconPicker() {
+  const icons = ICON_PALETTE[state.type] || [];
+  const size = getIconPageSize();
+  const totalPages = Math.max(1, Math.ceil(icons.length / size));
+  if (pickerState.iconPage >= totalPages) pickerState.iconPage = 0;
+  const start = pickerState.iconPage * size;
+  const page = icons.slice(start, start + size);
+  const currentIcon = document.getElementById('catIcon').value || '📦';
+
+  document.getElementById('iconPicker').innerHTML = page.map(ic =>
+    `<button type="button" data-icon="${ic}" title="選用 ${ic}" class="${ic === currentIcon ? 'selected' : ''}">${ic}</button>`
+  ).join('');
+  // 翻頁資訊
+  document.getElementById('iconPickerInfo').textContent =
+    `${start + 1}-${Math.min(start + size, icons.length)} / ${icons.length}`;
+  // 按鈕 enable/disable
+  document.getElementById('iconPrevBtn').disabled = pickerState.iconPage === 0;
+  document.getElementById('iconNextBtn').disabled = pickerState.iconPage >= totalPages - 1;
+}
+function setIcon(ic) {
+  document.getElementById('catIcon').value = ic;
+  document.getElementById('iconDisplay').textContent = ic;
+  document.getElementById('iconLabel').textContent = ic;
+  // 自動翻到該 icon 所在的頁
+  const icons = ICON_PALETTE[state.type] || [];
+  const idx = icons.indexOf(ic);
+  if (idx >= 0) pickerState.iconPage = Math.floor(idx / getIconPageSize());
+  renderIconPicker();
+}
+document.getElementById('iconPicker').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-icon]');
+  if (!btn) return;
+  setIcon(btn.dataset.icon);
+});
+document.getElementById('iconPrevBtn').addEventListener('click', () => {
+  if (pickerState.iconPage > 0) { pickerState.iconPage--; renderIconPicker(); }
+});
+document.getElementById('iconNextBtn').addEventListener('click', () => {
+  const icons = ICON_PALETTE[state.type] || [];
+  const totalPages = Math.max(1, Math.ceil(icons.length / getIconPageSize()));
+  if (pickerState.iconPage < totalPages - 1) { pickerState.iconPage++; renderIconPicker(); }
+});
+
+/* ---------- color picker (分頁式) ---------- */
+function renderColorPalette() {
+  const size = getColorPageSize();
+  const totalPages = Math.max(1, Math.ceil(COLOR_PALETTE.length / size));
+  if (pickerState.colorPage >= totalPages) pickerState.colorPage = 0;
+  const start = pickerState.colorPage * size;
+  const page = COLOR_PALETTE.slice(start, start + size);
+  const current = (document.getElementById('catColor').value || '').toUpperCase();
+
+  document.getElementById('colorPalette').innerHTML = page.map(c =>
+    `<button type="button" data-color="${c}" title="${c}" style="background:${c}" class="${c.toUpperCase() === current ? 'selected' : ''}"></button>`
+  ).join('');
+  document.getElementById('colorPickerInfo').textContent =
+    `${start + 1}-${Math.min(start + size, COLOR_PALETTE.length)} / ${COLOR_PALETTE.length}`;
+  document.getElementById('colorPrevBtn').disabled = pickerState.colorPage === 0;
+  document.getElementById('colorNextBtn').disabled = pickerState.colorPage >= totalPages - 1;
+}
+function setColor(hex) {
+  const v = hex.toUpperCase();
+  document.getElementById('catColor').value = v;
+  document.getElementById('colorSwatch').style.background = v;
+  // 自動翻到該 color 所在的頁
+  const idx = COLOR_PALETTE.findIndex(c => c.toUpperCase() === v);
+  if (idx >= 0) pickerState.colorPage = Math.floor(idx / getColorPageSize());
+  renderColorPalette();
+}
+document.getElementById('colorPalette').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-color]');
+  if (!btn) return;
+  setColor(btn.dataset.color);
+});
+document.getElementById('colorPrevBtn').addEventListener('click', () => {
+  if (pickerState.colorPage > 0) { pickerState.colorPage--; renderColorPalette(); }
+});
+document.getElementById('colorNextBtn').addEventListener('click', () => {
+  const totalPages = Math.max(1, Math.ceil(COLOR_PALETTE.length / getColorPageSize()));
+  if (pickerState.colorPage < totalPages - 1) { pickerState.colorPage++; renderColorPalette(); }
+});
+/* 手動輸入色碼也生效 */
+document.getElementById('catColor').addEventListener('input', e => {
+  const v = e.target.value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+    document.getElementById('colorSwatch').style.background = v;
+    renderColorPalette();
+  }
+});
+
+/* 視窗 resize: 重算每頁大小並重繪 */
+window.addEventListener('resize', () => {
+  renderIconPicker();
+  renderColorPalette();
+});
+
+/* ========================================================
+   Form: new / edit / delete
+   ======================================================== */
+function enterCatEditMode(c) {
+  state.editingCategoryId = c.categoryId;
+  // 若 type 和目前 seg 不同,切換 seg
+  if (c.categoryType !== state.type) {
+    state.type = c.categoryType;
+    document.querySelectorAll('.seg-btn').forEach(x =>
+      x.classList.toggle('active', x.dataset.type === state.type));
+  }
+  document.getElementById('catFormTitle').textContent = 'Edit: ' + c.categoryName;
+  document.getElementById('catName').value = c.categoryName;
+  setIcon(c.icon || '📦');
+  setColor(c.color || '#FF9F43');
+  document.getElementById('catDisabled').checked = !!c.isDisable;
+  document.getElementById('catSubmitBtn').textContent = 'Save changes';
+  document.getElementById('catCancelBtn').textContent = 'Cancel';
+  document.getElementById('catDeleteBtn').style.display = 'inline-flex';
+  render();
+}
+
+function resetCatForm() {
+  state.editingCategoryId = null;
+  document.getElementById('catForm').reset();
+  setIcon('📦');
+  setColor('#FF9F43');
+  document.getElementById('catFormTitle').textContent = 'New category';
+  document.getElementById('catSubmitBtn').textContent = 'Save category';
+  document.getElementById('catCancelBtn').textContent = 'Clear';
+  document.getElementById('catDeleteBtn').style.display = 'none';
+  render();
+}
+
+/* 點 tile */
+document.getElementById('tileGrid').addEventListener('click', e => {
+  // + 新增 tile: 重置 form 並 focus name
+  if (e.target.closest('#addCategoryTile')) {
+    resetCatForm();
+    document.getElementById('catName').focus();
+    return;
+  }
+  const tile = e.target.closest('[data-category-id]');
+  if (!tile) return;
+  const c = state.categories.find(x => x.categoryId === tile.dataset.categoryId);
+  if (c) enterCatEditMode(c);
+});
+/* 點 table row → edit mode */
+document.getElementById('catTableBody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-category-id]');
+  if (!tr) return;
+  const c = state.categories.find(x => x.categoryId === tr.dataset.categoryId);
+  if (c) enterCatEditMode(c);
+});
+
+/* Clear/Cancel */
+document.getElementById('catCancelBtn').addEventListener('click', resetCatForm);
+
+/* Delete */
+document.getElementById('catDeleteBtn').addEventListener('click', async () => {
+  if (!state.editingCategoryId) return;
+  const c = state.categories.find(x => x.categoryId === state.editingCategoryId);
+  if (!c) return;
+  if (c.isSystem) {
+    alert('系統預設分類無法刪除。');
+    return;
+  }
+  if (!confirm(`確認刪除分類「${c.icon || ''} ${c.categoryName}」? 此操作無法復原。`)) return;
+  try {
+    await WalletPet.categoryApi.remove(state.editingCategoryId);
+  } catch (ex) {
+    console.warn('[categories] 刪除失敗, 本地模擬');
+  }
+  state.categories = state.categories.filter(x => x.categoryId !== state.editingCategoryId);
+  resetCatForm();
+});
+
+/* Submit: create or update */
+document.getElementById('catForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = {
+    categoryName: document.getElementById('catName').value.trim(),
+    categoryType: state.type,
+    icon:          document.getElementById('catIcon').value.trim() || null,
+    color:         document.getElementById('catColor').value.trim() || null,
+    isDisable:    document.getElementById('catDisabled').checked,
+  };
+  if (!body.categoryName) return;
+
+  if (state.editingCategoryId) {
+    // UPDATE
+    try {
+      const updated = await WalletPet.categoryApi.update(state.editingCategoryId, body);
+      const idx = state.categories.findIndex(x => x.categoryId === state.editingCategoryId);
+      if (idx >= 0) state.categories[idx] = updated || { ...state.categories[idx], ...body };
+    } catch (ex) {
+      console.warn('[categories] 更新失敗, 本地模擬');
+      const idx = state.categories.findIndex(x => x.categoryId === state.editingCategoryId);
+      if (idx >= 0) state.categories[idx] = { ...state.categories[idx], ...body };
+    }
+  } else {
+    // CREATE - 從陣列前端插入,讓新分類出現在 tile grid 最左邊(緊鄰 +新增 tile)
+    try {
+      const created = await WalletPet.categoryApi.create(body);
+      state.categories.unshift(created);
+    } catch (ex) {
+      console.warn('[categories] 新增失敗, 本地模擬');
+      const prefix = state.type === 'EXPENSE' ? 'ES' : 'IS';
+      state.categories.unshift({
+        categoryId: prefix + '_local_' + Date.now(),
+        isSystem: false,
+        ...body,
+      });
+    }
+  }
+  resetCatForm();
+});
+
+/* ---- type switch ---- */
+document.querySelectorAll('.seg-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.seg-btn').forEach(x => x.classList.toggle('active', x === b));
+    state.type = b.dataset.type;
+    tilePager.goTo(1);
+    tablePager.goTo(1);
+    pickerState.iconPage = 0;   // 切換 EXPENSE/INCOME 回第一頁 icon
+    renderIconPicker();
+    render();
+  });
+});
+
+/* ---- search ---- */
+document.getElementById('searchInput').addEventListener('input', e => {
+  state.filter = e.target.value;
+  tilePager.goTo(1);
+  tablePager.goTo(1);
+  render();
+});
+
+/* ---- load ---- */
+async function init() {
+  try { state.categories = await WalletPet.categoryApi.list(); }
+  catch (e) {
+    console.warn('[categories] 使用 demo 資料 (' + e.message + ')');
+    state.categories = demoCategories;
+  }
+  renderIconPicker();
+  renderColorPalette();
+  render();
+}
+init();
+</script>
+</body>
+</html>

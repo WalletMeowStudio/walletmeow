@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WalletPet — Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./shared.css">
+<style>
+  .chart-wrap{
+    flex:1;min-height:0;border:2px dashed var(--ink);border-radius:14px;background:var(--paper);
+    padding:10px;display:flex;flex-direction:column;gap:10px;overflow:hidden;
+  }
+  .chart-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .chart-title{font-family:'Caveat';font-size:26px;line-height:1}
+  .chart-caption{font-size:12px;color:var(--muted);white-space:nowrap}
+
+  .right-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .right-title{font-family:'Caveat';font-size:26px;line-height:1}
+
+  .details-shell{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+  .list{
+    flex:1;min-height:0;border:2px dashed var(--ink);border-radius:12px;background:#fffaf2;
+    padding:6px;overflow:hidden;display:flex;flex-direction:column;gap:5px;
+  }
+
+  .analytics-main{
+    display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0;
+  }
+
+  @media (max-width: 899px){
+    .analytics-main{
+      grid-template-columns:1fr 1fr;gap:6px;
+    }
+    .list{min-height:0;padding:3px;gap:3px}
+    .chart-wrap{padding:5px;gap:4px}
+    .chart-head{gap:4px}
+    .right-head{gap:4px}
+    /* 右側 panel 內部壓縮 */
+    .analytics-main .panel{padding:5px;gap:5px}
+    .details-shell{gap:4px}
+  }
+</style>
+</head>
+<body>
+
+
+<main>
+  <h1 class="page-title" data-page="analytics">Analytics</h1>
+  <p class="page-sub">收支分析與圖表 (FR-16) · API: /api/charts/* · 資料來源: transactions / categories / budget</p>
+
+  <div class="shell">
+    <div class="analytics-main">
+      <section class="panel" style="display:flex;flex-direction:column;gap:10px">
+        <div class="seg" id="chartSeg">
+          <button class="seg-btn active" data-chart="expense">Expense</button>
+          <button class="seg-btn" data-chart="income">Income</button>
+          <button class="seg-btn" data-chart="cashflow">Cashflow</button>
+          <button class="seg-btn" data-chart="budget">Budget</button>
+        </div>
+
+        <div class="chart-wrap">
+          <div class="chart-head">
+            <div class="chart-title" id="chartTitle">Expense split</div>
+            <div class="chart-caption" id="chartCaption">Day view</div>
+          </div>
+          <div class="chart-box"><svg id="chartSvg" viewBox="0 0 360 190" preserveAspectRatio="xMidYMid meet"></svg></div>
+          <div class="chart-legend" id="chartLegend"></div>
+        </div>
+      </section>
+
+      <section class="panel" style="display:flex;flex-direction:column;gap:10px">
+        <div class="right-head">
+          <div class="right-title">Details</div>
+          <div class="time-seg" id="timeSeg">
+            <button class="active" data-time="day">Day</button>
+            <button data-time="week">Week</button>
+            <button data-time="month">Month</button>
+          </div>
+        </div>
+
+        <div class="mini-cards" id="miniCards"></div>
+
+        <div class="details-shell">
+          <div class="pager" id="pager"></div>
+          <div class="list">
+            <div class="row-h">
+              <div>date</div><div>category · account</div><div style="text-align:right">amount</div>
+            </div>
+            <div class="rows" id="rows"></div>
+          </div>
+        </div>
+
+        <div class="footer-note">資料: state.transactions · 聚合: day/week/month · 切換圖表重算</div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<div data-wp-tweaks></div>
+
+<script src="./shared.js"></script>
+<script src="./api.js"></script>
+<script>
+/* ==============================================================
+   Analytics page — 對齊 SQL / 後端規格
+   FR-16: 圖表應提供圓餅圖與折線圖,呈現收支比例、分類占比與時間趨勢
+
+   資料來源 (對齊 SQL):
+     transactions: { transactionId, userId, accountId, categoryId,
+                     transactionAmount (正數), transactionType (EXPENSE|INCOME),
+                     note, transactionDate (yyyy-MM-dd), createdAt }
+     categories:   { categoryId, categoryName, categoryType, icon, color, ... }
+     accounts:     { accountId, accountName, balance, currencyCode, ... }
+     budget:       { budgetId, budgetScope, categoryId, targetType,
+                     budgetAmount, startDate, endDate }
+
+   API (第 6 組 文淵 DashboardController / ChartController):
+     GET /api/charts/expense-pie?period=day|week|month
+         -> { items: [PieChartItemResponse], total }
+            PieChartItemResponse: { categoryId, categoryName, amount, color }
+     GET /api/charts/income-pie?period=...
+     GET /api/charts/cashflow-line?period=day|week|month
+         -> { points: [{ date, income, expense, net }] }
+     GET /api/charts/budget-usage?period=...
+         -> [{ budgetId, categoryId, categoryName, budgetAmount, usedAmount, usedPct }]
+
+   目前用 demo 資料計算 (fallback), 後端接好後可直接換掉 loadData()
+   ============================================================== */
+const fmt = WalletPet.format;
+
+/* ============================================================
+   Demo fallback: 和 transactions.html / categories.html 保持同步的資料
+   ============================================================ */
+const demoCategories = [
+  { categoryId: 'ES001', categoryName: '飲食', categoryType: 'EXPENSE', color: '#FF9F43' },
+  { categoryId: 'ES002', categoryName: '衣飾', categoryType: 'EXPENSE', color: '#A29BFE' },
+  { categoryId: 'ES003', categoryName: '住宅', categoryType: 'EXPENSE', color: '#c98a55' },
+  { categoryId: 'ES004', categoryName: '交通', categoryType: 'EXPENSE', color: '#4a7bb7' },
+  { categoryId: 'ES005', categoryName: '娛樂', categoryType: 'EXPENSE', color: '#e8c55a' },
+  { categoryId: 'ES006', categoryName: '水電', categoryType: 'EXPENSE', color: '#e8a63a' },
+  { categoryId: 'IS001', categoryName: '薪水', categoryType: 'INCOME',  color: '#2ECC71' },
+  { categoryId: 'IS002', categoryName: '投資', categoryType: 'INCOME',  color: '#3498DB' },
+  { categoryId: 'IS003', categoryName: '獎金', categoryType: 'INCOME',  color: '#6aa35d' },
+];
+const demoAccounts = [
+  { accountId: 1, accountName: '🏦 中信活存',   currencyCode: 'TWD' },
+  { accountId: 2, accountName: '💸 就學貸款',   currencyCode: 'TWD' },
+  { accountId: 4, accountName: '💵 現金錢包',   currencyCode: 'TWD' },
+];
+const demoTransactions = [
+  { transactionId: 't01', transactionDate: '2026-04-20', note: '☕ Louisa Coffee', transactionAmount:    85, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
+  { transactionId: 't02', transactionDate: '2026-04-20', note: '🛒 全聯',         transactionAmount:   246, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
+  { transactionId: 't03', transactionDate: '2026-04-19', note: '💰 薪資',         transactionAmount: 63000, transactionType: 'INCOME',  accountId: 1, categoryId: 'IS001' },
+  { transactionId: 't04', transactionDate: '2026-04-19', note: '🚇 悠遊卡',       transactionAmount:   100, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES004' },
+  { transactionId: 't05', transactionDate: '2026-04-18', note: '🍜 一蘭拉麵',     transactionAmount:   320, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
+  { transactionId: 't06', transactionDate: '2026-04-17', note: '🎬 威秀',         transactionAmount:   320, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES005' },
+  { transactionId: 't07', transactionDate: '2026-04-16', note: '💡 台電',         transactionAmount:  2340, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES006' },
+  { transactionId: 't08', transactionDate: '2026-04-15', note: '🍔 麥當勞',       transactionAmount:   180, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
+  { transactionId: 't09', transactionDate: '2026-04-14', note: '👕 UNIQLO',       transactionAmount:  1490, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES002' },
+  { transactionId: 't10', transactionDate: '2026-04-13', note: '☕ 星巴克',       transactionAmount:   145, transactionType: 'EXPENSE', accountId: 4, categoryId: 'ES001' },
+  { transactionId: 't11', transactionDate: '2026-04-12', note: '📈 股息',         transactionAmount:  3200, transactionType: 'INCOME',  accountId: 1, categoryId: 'IS002' },
+  { transactionId: 't12', transactionDate: '2026-04-11', note: '🏠 水費',         transactionAmount:   820, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES006' },
+  { transactionId: 't13', transactionDate: '2026-04-10', note: '🎁 年終獎金',     transactionAmount: 24000, transactionType: 'INCOME',  accountId: 1, categoryId: 'IS003' },
+  { transactionId: 't14', transactionDate: '2026-04-09', note: '🚕 Uber',         transactionAmount:   240, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES004' },
+  { transactionId: 't15', transactionDate: '2026-04-08', note: '🍱 7-11 午餐',    transactionAmount:   110, transactionType: 'EXPENSE', accountId: 4, categoryId: 'ES001' },
+  { transactionId: 't16', transactionDate: '2026-04-07', note: '🎵 Spotify',      transactionAmount:   149, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES005' },
+  { transactionId: 't17', transactionDate: '2026-04-06', note: '🛏 IKEA',         transactionAmount:  2890, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES003' },
+  { transactionId: 't18', transactionDate: '2026-04-05', note: '🚇 悠遊卡儲值',   transactionAmount:   500, transactionType: 'EXPENSE', accountId: 4, categoryId: 'ES004' },
+  { transactionId: 't19', transactionDate: '2026-04-04', note: '🍜 鼎泰豐',       transactionAmount:   680, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
+  { transactionId: 't20', transactionDate: '2026-04-03', note: '💰 打工薪水',     transactionAmount:  8500, transactionType: 'INCOME',  accountId: 1, categoryId: 'IS001' },
+  { transactionId: 't21', transactionDate: '2026-04-02', note: '📱 電話費',       transactionAmount:   599, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES006' },
+  { transactionId: 't22', transactionDate: '2026-04-01', note: '🏀 球鞋',         transactionAmount:  3200, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES002' },
+  { transactionId: 't23', transactionDate: '2026-03-31', note: '🍺 聚餐',         transactionAmount:   850, transactionType: 'EXPENSE', accountId: 4, categoryId: 'ES001' },
+];
+/* budget demo (對齊 SQL budget 表) */
+const demoBudgets = [
+  { budgetId: 'b01', budgetScope: 'MONTH', categoryId: 'ES001', targetType: 'EXPENSE', budgetAmount:  5000, startDate: '2026-04-01', endDate: '2026-04-30' },
+  { budgetId: 'b02', budgetScope: 'MONTH', categoryId: 'ES004', targetType: 'EXPENSE', budgetAmount:  1500, startDate: '2026-04-01', endDate: '2026-04-30' },
+  { budgetId: 'b03', budgetScope: 'MONTH', categoryId: 'ES005', targetType: 'EXPENSE', budgetAmount:  1000, startDate: '2026-04-01', endDate: '2026-04-30' },
+  { budgetId: 'b04', budgetScope: 'MONTH', categoryId: 'ES006', targetType: 'EXPENSE', budgetAmount:  4000, startDate: '2026-04-01', endDate: '2026-04-30' },
+];
+
+/* ============================================================
+   state
+   ============================================================ */
+const state = {
+  chart: 'expense',       // expense | income | cashflow | budget
+  time : 'month',         // day | week | month  (預設月,因為 demo 跨一個月)
+  page : 1,
+  transactions: [],
+  categories  : [],
+  accounts    : [],
+  budgets     : [],
+};
+
+/* ============================================================
+   日期計算輔助
+   - 以 demo 最新日期為基準 (非 today) 避免畫面空白
+   ============================================================ */
+function getReferenceDate() {
+  if (!state.transactions.length) return new Date();
+  const maxStr = state.transactions.map(t => t.transactionDate).sort().pop();
+  return new Date(maxStr + 'T00:00:00');
+}
+function toDateStr(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+function getPeriodRange(time) {
+  const ref = getReferenceDate();
+  const end = new Date(ref);
+  const start = new Date(ref);
+  if (time === 'day') {
+    // 單日 = ref 當天
+  } else if (time === 'week') {
+    start.setDate(start.getDate() - 6);   // 近 7 天
+  } else {
+    start.setDate(start.getDate() - 29);  // 近 30 天
+  }
+  return { start: toDateStr(start), end: toDateStr(end) };
+}
+function inRange(t, range) {
+  return t.transactionDate >= range.start && t.transactionDate <= range.end;
+}
+
+/* ============================================================
+   lookup helpers
+   ============================================================ */
+function lookupCategory(categoryId) {
+  return state.categories.find(c => c.categoryId === categoryId);
+}
+function lookupAccount(accountId) {
+  return state.accounts.find(a => a.accountId === accountId);
+}
+function categoryColor(categoryId) {
+  const c = lookupCategory(categoryId);
+  return (c && c.color) || '#888888';
+}
+
+/* ============================================================
+   Chart 1: Expense / Income pie
+   依 categoryId GROUP BY, sum(transactionAmount)
+   ============================================================ */
+function getPieSlices(transactionType) {
+  const range = getPeriodRange(state.time);
+  const filtered = state.transactions.filter(t =>
+    t.transactionType === transactionType && inRange(t, range));
+
+  // group by categoryId
+  const byCat = new Map();
+  filtered.forEach(t => {
+    const prev = byCat.get(t.categoryId) || 0;
+    byCat.set(t.categoryId, prev + Number(t.transactionAmount));
+  });
+
+  // map to slice format with category info
+  const slices = [];
+  byCat.forEach((amount, categoryId) => {
+    const cat = lookupCategory(categoryId);
+    slices.push({
+      categoryId,
+      label : cat ? cat.categoryName : categoryId,
+      value : amount,
+      color : (cat && cat.color) || '#888888',
+    });
+  });
+  // 大到小排序
+  slices.sort((a, b) => b.value - a.value);
+  return slices;
+}
+
+function renderDonut(transactionType) {
+  const svg    = document.getElementById('chartSvg');
+  const legend = document.getElementById('chartLegend');
+  const slices = getPieSlices(transactionType);
+  const total  = slices.reduce((a, b) => a + b.value, 0) || 1;
+  const cx = 180, cy = 95, r = 58, stroke = 34;
+  const circumference = 2 * Math.PI * r;
+
+  let offset = 0;
+  let html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#efe5d6" stroke-width="${stroke}"></circle>`;
+  slices.forEach(s => {
+    const frac = s.value / total;
+    const dash = frac * circumference;
+    html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${stroke}" stroke-dasharray="${dash} ${circumference-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+    offset += dash;
+  });
+  html += `<text x="${cx}" y="${cy-4}" text-anchor="middle" font-family="Caveat" font-size="28" fill="#1d1a17">${transactionType === 'EXPENSE' ? 'Spend' : 'Income'}</text>
+           <text x="${cx}" y="${cy+20}" text-anchor="middle" font-family="Kalam" font-size="12" fill="#8a8178">${fmt.money(total)}</text>`;
+
+  svg.innerHTML = html;
+  legend.innerHTML = slices.length
+    ? slices.map(s => `<span><i class="dot" style="background:${s.color}"></i>${s.label}</span>`).join('')
+    : `<span style="color:var(--muted)">無 ${transactionType} 資料</span>`;
+}
+
+/* ============================================================
+   Chart 2: Cashflow line
+   依 transactionDate GROUP BY, 每日 (income - expense) 淨額
+   ============================================================ */
+function getCashflowPoints() {
+  const range = getPeriodRange(state.time);
+  const filtered = state.transactions.filter(t => inRange(t, range));
+
+  // group by date
+  const byDate = new Map();
+  filtered.forEach(t => {
+    const prev = byDate.get(t.transactionDate) || { income: 0, expense: 0 };
+    if (t.transactionType === 'INCOME') prev.income  += Number(t.transactionAmount);
+    else                                 prev.expense += Number(t.transactionAmount);
+    byDate.set(t.transactionDate, prev);
+  });
+
+  // 補齊範圍內每一天 (沒交易也要 0)
+  const points = [];
+  const cursor = new Date(range.start + 'T00:00:00');
+  const end    = new Date(range.end   + 'T00:00:00');
+  while (cursor <= end) {
+    const d = toDateStr(cursor);
+    const entry = byDate.get(d) || { income: 0, expense: 0 };
+    points.push({ date: d, income: entry.income, expense: entry.expense, net: entry.income - entry.expense });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return points;
+}
+
+function renderCashflow() {
+  const svg    = document.getElementById('chartSvg');
+  const legend = document.getElementById('chartLegend');
+  const points = getCashflowPoints();
+  if (!points.length) { svg.innerHTML = ''; legend.innerHTML = ''; return; }
+
+  const nets = points.map(p => p.net);
+  const maxAbs = Math.max(1, ...nets.map(Math.abs));
+  const W = 360, H = 190, padX = 28, padY = 28;
+  const innerW = W - padX*2, innerH = H - padY*2;
+  const cy = padY + innerH/2;   // 0 軸 (Y 中線)
+  const stepX = points.length > 1 ? innerW / (points.length - 1) : 0;
+
+  const pts = points.map((p, i) => {
+    const x = padX + i * stepX;
+    const y = cy - (p.net / maxAbs) * (innerH / 2);
+    return [x, y];
+  });
+  const poly = pts.map(p => p.join(',')).join(' ');
+  const areaPts = `${padX},${cy} ${poly} ${padX + (points.length-1) * stepX},${cy}`;
+
+  svg.innerHTML = `
+    <line x1="${padX}" y1="${cy}" x2="${W-padX}" y2="${cy}" stroke="#c9bfb2" stroke-dasharray="3,3"></line>
+    <polygon points="${areaPts}" fill="rgba(93,124,226,.18)"></polygon>
+    <polyline points="${poly}" fill="none" stroke="#5d7ce2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    ${pts.map(([x,y], i) => {
+      const pos = points[i].net >= 0;
+      return `<circle cx="${x}" cy="${y}" r="4" fill="${pos?'#2e8b57':'#d76565'}" stroke="#1d1a17" stroke-width="1.2"></circle>`;
+    }).join('')}
+    <text x="${padX}" y="18" font-family="Caveat" font-size="20" fill="#1d1a17">Net flow (${points.length} days)</text>`;
+
+  const totalNet = nets.reduce((a,b) => a + b, 0);
+  legend.innerHTML = `
+    <span><i class="dot" style="background:#5d7ce2"></i>daily net</span>
+    <span><i class="dot" style="background:#2e8b57"></i>positive day</span>
+    <span><i class="dot" style="background:#d76565"></i>negative day</span>
+    <span style="margin-left:auto;font-family:'Caveat';font-size:18px">Σ ${fmt.money(totalNet, 'TWD', { showSign: true })}</span>`;
+}
+
+/* ============================================================
+   Chart 3: Budget usage
+   取 transactions 中 categoryId 在 budgets 範圍內且日期在 budget 期間的資料,
+   計算已用金額和百分比
+   ============================================================ */
+function getBudgetUsage() {
+  // 只算 EXPENSE 型 budget
+  return state.budgets
+    .filter(b => b.targetType === 'EXPENSE')
+    .map(b => {
+      const cat = lookupCategory(b.categoryId);
+      const used = state.transactions
+        .filter(t =>
+          t.transactionType === 'EXPENSE' &&
+          t.categoryId === b.categoryId &&
+          t.transactionDate >= b.startDate &&
+          t.transactionDate <= b.endDate)
+        .reduce((s, t) => s + Number(t.transactionAmount), 0);
+      const pct = b.budgetAmount > 0 ? Math.round(used / Number(b.budgetAmount) * 100) : 0;
+      return {
+        budgetId     : b.budgetId,
+        categoryId   : b.categoryId,
+        categoryName : cat ? cat.categoryName : b.categoryId,
+        color         : (cat && cat.color) || '#888888',
+        budgetAmount : Number(b.budgetAmount),
+        usedAmount   : used,
+        usedPct      : pct,
+        period        : b.startDate + ' ~ ' + b.endDate,
+      };
+    });
+}
+
+function renderBudget() {
+  const svg    = document.getElementById('chartSvg');
+  const legend = document.getElementById('chartLegend');
+  const usages = getBudgetUsage();
+  if (!usages.length) {
+    svg.innerHTML = `<text x="180" y="95" text-anchor="middle" font-family="Kalam" font-size="14" fill="#8a8178">尚未設定預算</text>`;
+    legend.innerHTML = '';
+    return;
+  }
+
+  const W = 360, H = 190, padX = 90, padRightGap = 48;
+  const barX = padX;
+  const maxBarW = W - padX - padRightGap;
+  const rowH = Math.min(34, (H - 30) / usages.length);
+  let y = 30;
+  let html = '';
+  usages.slice(0, 5).forEach(u => {    // 最多顯示 5 列避免爆版
+    const shownPct = Math.min(100, u.usedPct);
+    const over = u.usedPct > 100;
+    html += `
+      <text x="${padX - 6}" y="${y}" text-anchor="end" font-family="Kalam" font-size="11" fill="#4a413a">${u.categoryName}</text>
+      <rect x="${barX}" y="${y-10}" width="${maxBarW}" height="14" rx="7" fill="#efe5d6" stroke="#1d1a17" stroke-width="1.2"></rect>
+      <rect x="${barX}" y="${y-10}" width="${maxBarW * shownPct / 100}" height="14" rx="7" fill="${over ? '#d76565' : u.color}"></rect>
+      <text x="${W - padRightGap + 4}" y="${y}" font-family="Caveat" font-size="16" fill="${over ? '#d76565' : '#1d1a17'}">${u.usedPct}%</text>`;
+    y += rowH;
+  });
+  html += `<text x="${padX - 6}" y="${H - 8}" text-anchor="end" font-family="Caveat" font-size="18" fill="#1d1a17">Budget usage</text>`;
+  svg.innerHTML = html;
+
+  legend.innerHTML = usages.slice(0, 5).map(u =>
+    `<span><i class="dot" style="background:${u.usedPct > 100 ? '#d76565' : u.color}"></i>${u.categoryName} ${fmt.money(u.usedAmount)}/${fmt.money(u.budgetAmount)}</span>`
+  ).join('');
+}
+
+/* ============================================================
+   Right panel: Details list
+   顯示當前 chart + time 範圍內的真實 transactions
+   (或 budget 時顯示 budget usage 列表)
+   ============================================================ */
+function getDetailItems() {
+  if (state.chart === 'budget') {
+    return getBudgetUsage().map(u => ({
+      dateLabel : u.period,
+      title     : u.categoryName,
+      sub       : `used ${fmt.money(u.usedAmount)} / budget ${fmt.money(u.budgetAmount)}`,
+      amount    : -u.usedAmount,
+      color     : u.color,
+    }));
+  }
+
+  const range = getPeriodRange(state.time);
+  let filtered = state.transactions.filter(t => inRange(t, range));
+  if (state.chart === 'expense')  filtered = filtered.filter(t => t.transactionType === 'EXPENSE');
+  if (state.chart === 'income')   filtered = filtered.filter(t => t.transactionType === 'INCOME');
+  // cashflow 則顯示所有 transactions
+
+  // 按日期降序
+  filtered.sort((a, b) => b.transactionDate.localeCompare(a.transactionDate));
+
+  return filtered.map(t => {
+    const cat = lookupCategory(t.categoryId);
+    const acc = lookupAccount(t.accountId);
+    const signedAmount = (t.transactionType === 'EXPENSE' ? -1 : 1) * Number(t.transactionAmount);
+    return {
+      dateLabel : fmt.date(t.transactionDate),
+      title     : cat ? cat.categoryName : t.categoryId,
+      sub       : (acc ? acc.accountName : t.accountId) + (t.note ? ' · ' + t.note : ''),
+      amount    : signedAmount,
+      color     : (cat && cat.color) || '#888888',
+    };
+  });
+}
+
+function getMetrics() {
+  const items = getDetailItems();
+  const total = items.reduce((a, b) => a + b.amount, 0);
+  return {
+    total,
+    count: items.length,
+    avg  : items.length ? Math.round(total / items.length) : 0,
+  };
+}
+
+function getPages() {
+  const all = getDetailItems();
+  const pageSize = 7;
+  const totalPages = Math.max(1, Math.ceil(all.length / pageSize));
+  if (state.page > totalPages) state.page = 1;
+  const start = (state.page - 1) * pageSize;
+  return { items: all.slice(start, start + pageSize), totalPages };
+}
+
+function renderRight() {
+  const metrics = getMetrics();
+  document.getElementById('miniCards').innerHTML = `
+    <div class="mini-card"><div class="mini-label">total</div>
+      <div class="mini-value ${metrics.total < 0 ? 'neg' : 'pos'}">${fmt.money(metrics.total, 'TWD', { showSign: true })}</div></div>
+    <div class="mini-card"><div class="mini-label">items</div>
+      <div class="mini-value">${metrics.count}</div></div>
+    <div class="mini-card"><div class="mini-label">avg</div>
+      <div class="mini-value ${metrics.avg < 0 ? 'neg' : 'pos'}">${fmt.money(metrics.avg, 'TWD', { showSign: true })}</div></div>`;
+
+  const { items, totalPages } = getPages();
+  document.getElementById('pager').innerHTML =
+    `<span class="pager-label">page</span>` +
+    Array.from({length: totalPages}, (_, i) =>
+      `<button class="${i+1===state.page?'active':''}" data-page="${i+1}">${i+1}</button>`
+    ).join('');
+
+  if (!items.length) {
+    document.getElementById('rows').innerHTML = `<div class="detail-row" style="justify-content:center;color:var(--muted)">此範圍沒有資料</div>`;
+    return;
+  }
+  document.getElementById('rows').innerHTML = items.map(item => `
+    <div class="detail-row">
+      <div class="d-time" style="display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:3px;height:18px;background:${item.color};border-radius:2px"></span>
+        ${item.dateLabel}
+      </div>
+      <div class="d-main">
+        <div class="d-title">${item.title}</div>
+        <div class="d-sub">${item.sub}</div>
+      </div>
+      <div class="d-amt ${item.amount < 0 ? 'neg' : 'pos'}">${fmt.money(item.amount, 'TWD', { showSign: true })}</div>
+    </div>`).join('');
+}
+
+function renderLeft() {
+  const titles = {
+    expense : 'Expense split',
+    income  : 'Income split',
+    cashflow: 'Cashflow trend',
+    budget  : 'Budget usage',
+  };
+  const captions = {
+    day  : 'Day view (當日)',
+    week : 'Week view (近 7 天)',
+    month: 'Month view (近 30 天)',
+  };
+  document.getElementById('chartTitle').textContent   = titles[state.chart];
+  document.getElementById('chartCaption').textContent = state.chart === 'budget' ? 'Budget period' : captions[state.time];
+
+  if (state.chart === 'expense')       renderDonut('EXPENSE');
+  else if (state.chart === 'income')   renderDonut('INCOME');
+  else if (state.chart === 'cashflow') renderCashflow();
+  else                                 renderBudget();
+}
+
+function syncButtons() {
+  document.querySelectorAll('#chartSeg button').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.chart === state.chart));
+  document.querySelectorAll('#timeSeg button').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.time === state.time));
+  // budget 沒有時間粒度概念(依 startDate/endDate),整個 timeSeg 隱藏
+  document.getElementById('timeSeg').style.visibility = state.chart === 'budget' ? 'hidden' : 'visible';
+}
+
+function render() {
+  syncButtons();
+  renderLeft();
+  renderRight();
+}
+
+/* ---------- events ---------- */
+document.getElementById('chartSeg').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-chart]'); if (!btn) return;
+  state.chart = btn.dataset.chart;
+  state.page = 1;
+  render();
+});
+document.getElementById('timeSeg').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-time]'); if (!btn) return;
+  state.time = btn.dataset.time;
+  state.page = 1;
+  render();
+});
+document.getElementById('pager').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-page]'); if (!btn) return;
+  state.page = Number(btn.dataset.page);
+  renderRight();
+  syncButtons();
+});
+
+/* ============================================================
+   load data
+   後端 API 做好以後,可以改成 Promise.all 呼叫 charts API
+   ============================================================ */
+async function loadData() {
+  // categories / accounts / transactions 都從個別 API 載入
+  try {
+    const [cats, accs, txs] = await Promise.all([
+      WalletPet.categoryApi.list(),
+      WalletPet.accountApi.list(),
+      WalletPet.transactionApi.list(),
+    ]);
+    state.categories   = cats;
+    state.accounts     = accs;
+    state.transactions = txs;
+  } catch (e) {
+    console.warn('[analytics] 使用 demo 資料 (' + e.message + ')');
+    state.categories   = demoCategories;
+    state.accounts     = demoAccounts;
+    state.transactions = demoTransactions;
+  }
+  // budget 先固定用 demo (之後接 /api/budgets)
+  try {
+    state.budgets = await WalletPet.budgetApi.list();
+  } catch (e) {
+    state.budgets = demoBudgets;
+  }
+  render();
+}
+loadData();
+</script>
+</body>
+</html>

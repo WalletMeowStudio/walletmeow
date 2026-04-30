@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WalletPet — Accounts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./shared.css">
+<style>
+  /* 左 form + 右 list 版型 (對齊 transactions/goals) */
+  .acc-grid{
+    display:grid;grid-template-columns: minmax(280px, 360px) 1fr;gap:12px;
+    flex:1;min-height:0;
+  }
+  .acc-panel{
+    border:2px solid var(--ink);border-radius:14px;background:rgba(255,255,255,.22);
+    box-shadow:3px 3px 0 var(--ink);
+    display:flex;flex-direction:column;padding:12px;gap:10px;min-width:0;min-height:0;
+  }
+  .acc-panel > form{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow:auto}
+
+  .table-host{
+    flex:1;min-height:0;border:2px dashed var(--ink);border-radius:12px;
+    background:#fffaf2;padding:6px;overflow:auto;
+  }
+  /* 可點擊的列 + 選中高亮 */
+  .table-host table.wire{table-layout:fixed;width:100%}
+  .table-host col.c-name { width: 30%; }       /* 帳戶名佔 30% */
+  .table-host col.c-cur  { width: 15%; }       /* 四欄用百分比平均分 */
+  .table-host col.c-liab { width: 17%; }
+  .table-host col.c-sav  { width: 17%; }
+  .table-host col.c-bal  { width: 21%; }
+  .table-host td:nth-child(1){
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  /* 帳戶名 cell: emoji 固定寬度容器, 後面文字才能對齊 */
+  .table-host .acc-emoji{
+    display:inline-block;
+    width:22px;                /* 桌機固定寬 */
+    text-align:center;
+    margin-right:6px;
+    vertical-align:middle;
+  }
+  .table-host .acc-label{
+    vertical-align:middle;
+  }
+
+  /* 帳戶 icon picker: 4 個快速選擇 emoji 按鈕 */
+  .acc-icon-picker{
+    display:grid;grid-template-columns:repeat(4, 1fr);gap:6px;
+    border:1.5px dashed var(--ink-soft);border-radius:10px;
+    padding:6px;background:#fffaf2;
+  }
+  .acc-icon-btn{
+    border:2px solid var(--ink);background:#fff;color:var(--ink);
+    border-radius:8px;padding:6px 0;cursor:pointer;
+    font-size:22px;line-height:1;
+    box-shadow:2px 2px 0 var(--ink);
+    transition:transform .08s;
+  }
+  .acc-icon-btn:hover{
+    transform:translate(-1px,-1px);
+    box-shadow:3px 3px 0 var(--accent);
+    border-color:var(--accent);
+  }
+  .acc-icon-btn.selected{
+    background:var(--accent-soft);
+    border-color:var(--accent);
+    box-shadow:3px 3px 0 var(--accent);
+  }
+  /* pill 欄位置中對齊 */
+  .table-host th:nth-child(2), .table-host td:nth-child(2),
+  .table-host th:nth-child(3), .table-host td:nth-child(3),
+  .table-host th:nth-child(4), .table-host td:nth-child(4){
+    text-align:center;
+  }
+  .table-host tbody tr{cursor:pointer}
+  .table-host tbody tr:hover td{background:rgba(232,100,58,.08)}
+  .table-host tbody tr.selected td{background:var(--accent-soft)}
+
+  /* Net worth 條 (放在 toolbar) */
+  .nw-chip{
+    display:inline-flex;align-items:baseline;gap:10px;
+    padding:4px 12px;border:2px solid var(--ink);border-radius:10px;
+    background:#fff;box-shadow:2px 2px 0 var(--ink);
+    font-family:'Kalam';font-size:12px;color:var(--muted);
+  }
+  .nw-chip .nw-label{font-family:'Kalam';font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .nw-chip .nw-value{font-family:'Caveat';font-size:22px;font-weight:700;color:var(--ink);line-height:1}
+  .nw-chip .nw-sub{font-family:'Kalam';font-size:11px;color:var(--muted)}
+  .nw-chip .nw-sub b{color:var(--ink)}
+
+  /* 紅色刪除按鈕 */
+  .btn.danger{
+    background:#fff;color:var(--rose);border-color:var(--rose);
+    box-shadow:2px 2px 0 var(--rose);
+  }
+  .btn.danger:hover{background:#ffe5e5}
+
+  /* 勾選方塊群 (isLiability / isSavingAccount) */
+  .flag-row{
+    display:flex;gap:8px;flex-wrap:wrap;
+    font-family:'Kalam';font-size:13px;
+  }
+  .flag-row label{
+    display:flex;align-items:center;gap:6px;cursor:pointer;
+    padding:4px 10px;border:1.5px solid var(--ink-soft);border-radius:8px;
+    background:#fff;
+    transition:all .08s;
+  }
+  .flag-row label:has(input:checked){
+    background:var(--accent-soft);border-color:var(--accent);
+  }
+  .flag-row input[type="checkbox"]{accent-color:var(--accent)}
+
+  @media (max-width: 899px){
+    /* 手機版: 保留左右版型, 內容緊湊塞進一頁 */
+    .acc-grid{
+      grid-template-columns: minmax(180px, 240px) 1fr;
+      gap:6px;
+      flex:1;min-height:0;
+    }
+    .acc-panel{padding:6px;gap:4px;min-height:0}
+    .acc-panel > form{overflow-y:auto;min-height:0;gap:6px;position:relative}
+    /* form 最後一個 .row (按鈕組) sticky 在底部 */
+    .acc-panel > form > .row:last-child{
+      position:sticky;bottom:0;
+      background:rgba(255,255,255,.95);
+      padding:4px 0;margin-top:auto;
+      z-index:2;
+    }
+    .acc-panel > form .form-spacer{display:none}
+    .acc-panel h3{font-size:14px}
+    label.field{margin-bottom:2px}
+    label.field span{font-size:11px;margin-bottom:0}
+    .input{font-size:12px;padding:3px 6px}
+    .nw-chip{gap:4px;padding:2px 6px}
+    .nw-chip .nw-value{font-size:14px}
+    .nw-chip .nw-sub{font-size:8px}
+    .nw-chip .nw-label{font-size:9px}
+    .table-host{padding:3px;font-size:11px}
+    .table-host th, .table-host td{padding:3px 4px !important}
+    .table-host .acc-emoji{width:18px;margin-right:4px}
+    .acc-icon-picker{padding:3px;gap:3px}
+    .acc-icon-btn{padding:3px 0;font-size:16px}
+    .flag-row label{padding:2px 6px;font-size:11px}
+  }
+</style>
+</head>
+<body>
+
+
+<main>
+  <h1 class="page-title" data-page="accounts">Accounts <span class="count" id="accountCount">—</span></h1>
+  <p class="page-sub">管理所有帳戶與餘額 · 資料表: accounts · API: /api/accounts</p>
+
+  <div class="toolbar">
+    <input class="input" id="searchInput" placeholder="🔍 search account" style="max-width:220px"/>
+    <select class="input" id="typeFilter" style="max-width:160px">
+      <option value="">所有類型</option>
+      <option value="asset">資產</option>
+      <option value="liability">負債</option>
+      <option value="saving">存款帳戶</option>
+    </select>
+    <span class="spacer"></span>
+    <!-- Net worth 縮成 chip 放 toolbar -->
+    <div class="nw-chip">
+      <span class="nw-label">Net</span>
+      <span class="nw-value" id="netWorth">—</span>
+      <span class="nw-sub">資產 <b id="totalAssets">—</b> · 負債 <b id="totalLiab">—</b></span>
+    </div>
+  </div>
+
+  <div class="acc-grid">
+    <!-- 左: 新增 / 編輯 表單 -->
+    <section class="acc-panel">
+      <h3 style="margin:0" id="accFormTitle">New account</h3>
+      <form id="accForm" novalidate>
+        <div class="field">
+          <span>icon</span>
+          <div class="acc-icon-picker" id="accIconPicker">
+            <button type="button" class="acc-icon-btn" data-icon="🏦" title="銀行/活存">🏦</button>
+            <button type="button" class="acc-icon-btn" data-icon="🏛" title="定存/高利存">🏛</button>
+            <button type="button" class="acc-icon-btn" data-icon="💵" title="現金錢包">💵</button>
+            <button type="button" class="acc-icon-btn" data-icon="💸" title="負債 (房貸/車貸/學貸等)">💸</button>
+          </div>
+        </div>
+        <label class="field">
+          <span>accountName</span>
+          <input class="input" id="accName" name="accountName" placeholder="e.g. 🏦 中信活存" required maxlength="45"/>
+        </label>
+        <label class="field">
+          <span>balance</span>
+          <input class="input" id="accBalance" name="balance" type="number" step="0.01" placeholder="0" required/>
+        </label>
+        <label class="field">
+          <span>currencyCode</span>
+          <select class="input" id="accCurrency" name="currencyCode">
+            <option value="TWD">TWD (新台幣)</option>
+          </select>
+        </label>
+        <div class="field">
+          <span>type flags</span>
+          <div class="flag-row">
+            <label><input type="checkbox" id="accLiability" name="isLiability"/> isLiability</label>
+            <label><input type="checkbox" id="accSaving" name="isSavingAccount"/> isSavingAccount</label>
+          </div>
+        </div>
+
+        <div class="form-spacer"></div>
+        <div class="row" style="gap:8px;margin-top:4px">
+          <button type="button" class="btn danger" id="accDeleteBtn" style="display:none;justify-content:center;padding:6px 12px">🗑 Delete</button>
+          <button type="button" class="btn" id="accCancelBtn" style="flex:1;justify-content:center">Clear</button>
+          <button type="submit" class="btn primary" id="accSubmitBtn" style="flex:1;justify-content:center">Save account</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 右: 帳戶表 -->
+    <section class="acc-panel">
+      <div class="table-host">
+        <table class="wire">
+          <colgroup>
+            <col class="c-name"/>
+            <col class="c-cur"/>
+            <col class="c-liab"/>
+            <col class="c-sav"/>
+            <col class="c-bal"/>
+          </colgroup>
+          <thead>
+            <tr>
+              <th>accountName</th>
+              <th>currency</th>
+              <th>liability</th>
+              <th>saving</th>
+              <th style="text-align:right">balance</th>
+            </tr>
+          </thead>
+          <tbody id="accountsBody">
+            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">讀取中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="wp-pager" id="accountsPager"></div>
+    </section>
+  </div>
+</main>
+
+<div data-wp-tweaks></div>
+
+<script src="./shared.js"></script>
+<script src="./api.js"></script>
+<script>
+/* ==============================================================
+   Accounts page
+   AccountResponse (對齊 SQL accounts):
+     { accountId, userId, accountName, balance, currencyCode,
+       isLiability, isSavingAccount, createdAt }
+   API:
+     GET    /api/accounts
+     POST   /api/accounts
+     PUT    /api/accounts/{id}
+     DELETE /api/accounts/{id}
+   ============================================================== */
+const fmt = WalletPet.format;
+
+const demoAccounts = [
+  // 資產
+  { accountId: 1,  accountName: '🏦 中信活存',   balance:  243060, currencyCode: 'TWD', isLiability: false, isSavingAccount: false },
+  { accountId: 3,  accountName: '🏛 國泰高利存', balance:  336000, currencyCode: 'TWD', isLiability: false, isSavingAccount: true  },
+  { accountId: 4,  accountName: '💵 現金錢包',   balance:    8340, currencyCode: 'TWD', isLiability: false, isSavingAccount: false },
+  { accountId: 5,  accountName: '🏦 玉山數位',   balance:   12480, currencyCode: 'TWD', isLiability: false, isSavingAccount: false },
+  { accountId: 7,  accountName: '🏛 郵局定存',   balance:   50000, currencyCode: 'TWD', isLiability: false, isSavingAccount: true  },
+  { accountId: 8,  accountName: '🏦 兆豐銀行',   balance:   62000, currencyCode: 'TWD', isLiability: false, isSavingAccount: false },
+  { accountId: 10, accountName: '🏛 永豐高利活', balance:  180000, currencyCode: 'TWD', isLiability: false, isSavingAccount: true  },
+  { accountId: 11, accountName: '💵 旅行基金',   balance:   24000, currencyCode: 'TWD', isLiability: false, isSavingAccount: false },
+  // 負債
+  { accountId: 2,  accountName: '💸 就學貸款',   balance: -186000, currencyCode: 'TWD', isLiability: true,  isSavingAccount: false },
+  { accountId: 6,  accountName: '💸 房貸',       balance:-2840000, currencyCode: 'TWD', isLiability: true,  isSavingAccount: false },
+  { accountId: 9,  accountName: '💸 車貸',       balance: -240000, currencyCode: 'TWD', isLiability: true,  isSavingAccount: false },
+  { accountId: 12, accountName: '💸 家人借款',   balance:  -45000, currencyCode: 'TWD', isLiability: true,  isSavingAccount: false },
+];
+
+const state = {
+  accounts: [],
+  filter: '',
+  typeFilter: '',
+  editingAccountId: null,
+};
+const pager = WalletPet.createPager({ pageSize: 8 });
+function adjustPagerSize() {
+  pager.pageSize = window.matchMedia('(max-width: 899px)').matches ? 4 : 8;
+}
+adjustPagerSize();
+window.addEventListener('resize', () => { adjustPagerSize(); renderTable(); });
+
+function classifyAccount(a) {
+  if (a.isLiability) return 'liability';
+  if (a.isSavingAccount) return 'saving';
+  return 'asset';
+}
+
+/* ---------- 渲染 ---------- */
+function renderSummary() {
+  const assets = state.accounts.filter(a => !a.isLiability).reduce((s,a) => s + Number(a.balance), 0);
+  const liab   = state.accounts.filter(a =>  a.isLiability).reduce((s,a) => s + Number(a.balance), 0);
+  const net    = assets + liab;
+
+  document.getElementById('netWorth').textContent    = fmt.money(net);
+  document.getElementById('totalAssets').textContent = fmt.money(assets);
+  document.getElementById('totalLiab').textContent   = fmt.money(liab, 'TWD', { showSign: true });
+}
+
+function renderTable() {
+  const q = state.filter.toLowerCase();
+  const filtered = state.accounts
+    .filter(a => !q || a.accountName.toLowerCase().includes(q))
+    .filter(a => !state.typeFilter || classifyAccount(a) === state.typeFilter);
+
+  pager.setItems(filtered);
+  const visible = pager.visible();
+
+  const rows = visible.map(a => {
+    const negClass = Number(a.balance) < 0 ? 'amt-neg' : '';
+    const sel = a.accountId === state.editingAccountId ? ' class="selected"' : '';
+    // 分離 emoji 和名字, 用固定寬度容器包 emoji 確保文字起始位置對齊
+    const name = a.accountName || '';
+    // 簡單偵測首字元是否為 emoji (非 ASCII 且可能是多字節符號)
+    let emoji = '', label = name;
+    const match = name.match(/^(\p{Extended_Pictographic}\uFE0F?)\s*(.*)$/u);
+    if (match) {
+      emoji = match[1];
+      label = match[2];
+    }
+    return `<tr${sel} data-account-id="${a.accountId}">
+      <td title="${name.replace(/"/g, '&quot;')}">
+        <span class="acc-emoji">${emoji}</span><span class="acc-label">${label}</span>
+      </td>
+      <td>${a.currencyCode}</td>
+      <td><span class="pill${a.isLiability ? ' accent' : ''}">${a.isLiability}</span></td>
+      <td><span class="pill${a.isSavingAccount ? ' accent' : ''}">${a.isSavingAccount}</span></td>
+      <td style="text-align:right" class="${negClass}">${fmt.money(a.balance, a.currencyCode)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('accountsBody').innerHTML = rows ||
+    '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">無符合條件的帳戶</td></tr>';
+  document.getElementById('accountCount').textContent = state.accounts.length + ' accounts';
+
+  pager.renderInto('accountsPager', renderTable);
+}
+
+/* ========================================================
+   Account form: new / edit / delete
+   ======================================================== */
+function enterAccEditMode(a) {
+  state.editingAccountId = a.accountId;
+  document.getElementById('accFormTitle').textContent = 'Edit: ' + a.accountName;
+  document.getElementById('accName').value     = a.accountName;
+  document.getElementById('accBalance').value  = a.balance;
+  document.getElementById('accCurrency').value = a.currencyCode;
+  document.getElementById('accLiability').checked = !!a.isLiability;
+  document.getElementById('accSaving').checked    = !!a.isSavingAccount;
+  document.getElementById('accSubmitBtn').textContent = 'Save changes';
+  document.getElementById('accCancelBtn').textContent = 'Cancel';
+  document.getElementById('accDeleteBtn').style.display = 'inline-flex';
+  // 同步 icon picker 高亮: 根據 accountName 首字元 emoji
+  syncIconPickerHighlight(a.accountName);
+  renderTable();
+}
+
+function resetAccForm() {
+  state.editingAccountId = null;
+  document.getElementById('accForm').reset();
+  document.getElementById('accFormTitle').textContent = 'New account';
+  document.getElementById('accSubmitBtn').textContent = 'Save account';
+  document.getElementById('accCancelBtn').textContent = 'Clear';
+  document.getElementById('accDeleteBtn').style.display = 'none';
+  // 清除 icon picker 高亮
+  syncIconPickerHighlight('');
+  renderTable();
+}
+
+/* 根據 accountName 首字元 emoji 高亮對應的 picker 按鈕 */
+function syncIconPickerHighlight(name) {
+  const match = (name || '').match(/^(\p{Extended_Pictographic}\uFE0F?)/u);
+  const icon = match ? match[1] : null;
+  document.querySelectorAll('.acc-icon-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.icon === icon);
+  });
+}
+
+/* 點列表列 → 進 edit mode */
+document.getElementById('accountsBody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-account-id]');
+  if (!tr) return;
+  const a = state.accounts.find(x => String(x.accountId) === tr.dataset.accountId);
+  if (a) enterAccEditMode(a);
+});
+
+/* Cancel/Clear */
+document.getElementById('accCancelBtn').addEventListener('click', resetAccForm);
+
+/* Delete */
+document.getElementById('accDeleteBtn').addEventListener('click', async () => {
+  if (!state.editingAccountId) return;
+  const a = state.accounts.find(x => x.accountId === state.editingAccountId);
+  if (!a) return;
+  if (!confirm(`確認刪除帳戶「${a.accountName}」? 此操作無法復原。`)) return;
+  try {
+    await WalletPet.accountApi.remove(state.editingAccountId);
+  } catch (ex) {
+    console.warn('[accounts] 刪除失敗, 本地模擬');
+  }
+  state.accounts = state.accounts.filter(x => x.accountId !== state.editingAccountId);
+  resetAccForm();
+  renderSummary();
+});
+
+/* icon picker: 點擊後把 emoji 帶入 accountName 開頭 */
+document.getElementById('accIconPicker').addEventListener('click', e => {
+  const btn = e.target.closest('.acc-icon-btn');
+  if (!btn) return;
+  const icon = btn.dataset.icon;
+  const nameInput = document.getElementById('accName');
+  const current = nameInput.value;
+
+  // 先移除既有首字元 emoji (如果有),再帶入新 emoji
+  const stripped = current.replace(/^(\p{Extended_Pictographic}\uFE0F?)\s*/u, '');
+  nameInput.value = icon + ' ' + stripped;
+
+  // 高亮選中的按鈕
+  document.querySelectorAll('.acc-icon-btn').forEach(b => b.classList.toggle('selected', b === btn));
+  nameInput.focus();
+});
+
+/* Submit: create or update */
+document.getElementById('accForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = {
+    accountName:      document.getElementById('accName').value.trim(),
+    balance:           Number(document.getElementById('accBalance').value),
+    currencyCode:     document.getElementById('accCurrency').value,
+    isLiability:      document.getElementById('accLiability').checked,
+    isSavingAccount: document.getElementById('accSaving').checked,
+  };
+  if (!body.accountName) return;
+
+  if (state.editingAccountId) {
+    // UPDATE
+    try {
+      const updated = await WalletPet.accountApi.update(state.editingAccountId, body);
+      const idx = state.accounts.findIndex(x => x.accountId === state.editingAccountId);
+      if (idx >= 0) state.accounts[idx] = updated || { ...state.accounts[idx], ...body };
+    } catch (ex) {
+      console.warn('[accounts] 更新失敗, 本地模擬');
+      const idx = state.accounts.findIndex(x => x.accountId === state.editingAccountId);
+      if (idx >= 0) state.accounts[idx] = { ...state.accounts[idx], ...body };
+    }
+  } else {
+    // CREATE
+    try {
+      const created = await WalletPet.accountApi.create(body);
+      state.accounts.push(created);
+    } catch (ex) {
+      console.warn('[accounts] 新增失敗, 本地模擬');
+      state.accounts.push({
+        accountId: 'a_local_' + Date.now(),
+        ...body,
+      });
+    }
+  }
+  resetAccForm();
+  renderSummary();
+});
+
+/* Search/filter */
+document.getElementById('searchInput').addEventListener('input', e => {
+  state.filter = e.target.value;
+  pager.goTo(1);
+  renderTable();
+});
+document.getElementById('typeFilter').addEventListener('change', e => {
+  state.typeFilter = e.target.value;
+  pager.goTo(1);
+  renderTable();
+});
+
+/* ---------- 載入 ---------- */
+async function loadAccounts() {
+  try {
+    state.accounts = await WalletPet.accountApi.list();
+  } catch (e) {
+    console.warn('[accounts] 使用 demo 資料 (' + e.message + ')');
+    state.accounts = demoAccounts;
+  }
+  renderSummary();
+  renderTable();
+}
+
+loadAccounts();
+</script>
+</body>
+</html>

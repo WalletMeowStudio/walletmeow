@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WalletPet — Goals &amp; Budgets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./shared.css">
+<style>
+  .tab-pane{flex:1;min-height:0;display:flex;flex-direction:column}
+  .tab-pane[hidden]{display:none}
+  .gb-grid{
+    display:grid;grid-template-columns: minmax(280px, 360px) 1fr;gap:12px;
+    flex:1;min-height:0;
+  }
+  .gb-panel{
+    border:2px solid var(--ink);border-radius:14px;background:rgba(255,255,255,.22);
+    box-shadow:3px 3px 0 var(--ink);
+    display:flex;flex-direction:column;padding:12px;gap:10px;min-width:0;min-height:0;
+  }
+  .gb-panel > form{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow:auto}
+  .goal-cards{display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:10px}
+  .goal-cards .card{padding:12px;cursor:pointer;transition:transform .08s ease}
+  .goal-cards .card:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--ink)}
+  .goal-cards .card.selected{
+    background:var(--accent-soft);
+    box-shadow:5px 5px 0 var(--accent);
+    border-color:var(--accent);
+  }
+  .gb-table-host{flex:1;min-height:0;border:2px dashed var(--ink);border-radius:12px;background:#fffaf2;padding:6px;overflow:auto}
+  /* 可點擊的列 + 當前選中列高亮 */
+  .gb-table-host tr{cursor:pointer}
+  .gb-table-host tr:hover td{background:rgba(232,100,58,.08)}
+  .gb-table-host tr.selected td{background:var(--accent-soft)}
+
+  /* 紅色刪除按鈕 */
+  .btn.danger{
+    background:#fff;color:var(--rose);border-color:var(--rose);
+    box-shadow:2px 2px 0 var(--rose);
+  }
+  .btn.danger:hover{background:#ffe5e5}
+
+  @media (max-width: 899px){
+    /* 手機版: 保留左右版型, 內容緊湊塞進一頁 */
+    .gb-grid{
+      grid-template-columns: minmax(180px, 240px) 1fr;
+      gap:6px;
+      flex:1;min-height:0;
+    }
+    .gb-panel{padding:6px;gap:8px;min-height:0}
+    .gb-panel > form{overflow-y:auto;min-height:0;gap:6px;position:relative}
+    /* form 最後一個 .row (按鈕組) sticky 在底部 */
+    .gb-panel > form > .row:last-child{
+      position:sticky;bottom:0;
+      background:rgba(255,255,255,.95);
+      padding:4px 0;margin-top:auto;
+      z-index:2;
+    }
+    .gb-panel > form .form-spacer{display:none}
+    .gb-panel h3{font-size:14px}
+    .gb-table-host{padding:3px;font-size:11px}
+    .gb-table-host th, .gb-table-host td{padding:3px 4px !important}
+    .goal-cards{grid-template-columns:repeat(3,1fr);gap:4px}
+    .goal-cards .card{
+      padding:5px;
+      box-shadow:2px 2px 0 var(--ink);   /* 縮小陰影避免壓到下方虛線 */
+    }
+    .goal-cards .card h3{font-size:13px;margin-bottom:2px}
+    .goal-cards .card .kpi{gap:2px}
+    .kpi .n{font-size:14px}
+    .kpi .l{font-size:9px}
+    label.field{margin-bottom:2px}
+    label.field span{font-size:11px}
+    .input{font-size:12px;padding:3px 6px}
+    .t-btn{font-size:14px;padding:4px 8px}
+  }
+</style>
+</head>
+<body>
+
+
+<main>
+  <h1 class="page-title" data-page="goals">Goals &amp; Budgets</h1>
+  <p class="page-sub">目標存款 (saving_goals) 與預算控管 (budget) · API: /api/saving-goals & /api/budgets</p>
+
+  <div class="tab-switch">
+    <button class="t-btn active" data-tab="goals">🎯 Goals</button>
+    <button class="t-btn" data-tab="budgets">💰 Budgets</button>
+  </div>
+
+  <!-- ============ GOALS TAB ============ -->
+  <div class="tab-pane" data-pane="goals">
+    <div class="gb-grid">
+      <!-- LEFT: goal form (new / edit) -->
+      <section class="gb-panel">
+        <h3 style="margin:0" id="goalFormTitle">New goal</h3>
+        <form id="goalForm" novalidate>
+          <label class="field">
+            <span>goalName</span>
+            <input class="input" id="goalName" name="goalName" placeholder="e.g. 日本旅行" required/>
+          </label>
+          <label class="field">
+            <span>targetAmount</span>
+            <input class="input" id="goalTarget" name="targetAmount" type="number" min="0" step="1" placeholder="120000" required/>
+          </label>
+          <label class="field">
+            <span>accountId <small>(UNIQUE — 一帳戶僅能綁一目標)</small></span>
+            <select class="input" id="goalAccount" name="accountId" required></select>
+          </label>
+          <div class="row" style="gap:10px">
+            <label class="field" style="flex:1">
+              <span>startDate</span>
+              <input class="input" id="goalStart" name="startDate" type="date" required/>
+            </label>
+            <label class="field" style="flex:1">
+              <span>endDate</span>
+              <input class="input" id="goalEnd" name="endDate" type="date" required/>
+            </label>
+          </div>
+          <div class="form-spacer"></div>
+          <div class="row" style="gap:8px;margin-top:4px">
+            <button type="button" class="btn danger" id="goalDeleteBtn" style="display:none;justify-content:center;padding:6px 12px">🗑 Delete</button>
+            <button type="button" class="btn" id="goalCancelBtn" style="flex:1;justify-content:center">Cancel</button>
+            <button type="submit" class="btn primary" id="goalSubmitBtn" style="flex:1;justify-content:center">Save goal</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- RIGHT: goal cards + table -->
+      <section class="gb-panel">
+        <div class="goal-cards" id="goalCards"></div>
+        <div class="gb-table-host">
+          <table class="wire">
+            <thead>
+              <tr>
+                <th>goalName</th><th>targetAmount</th><th>saved</th>
+                <th>accountId</th><th>startDate</th><th>endDate</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="goalTableBody">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">讀取中…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="wp-pager" id="goalsPager"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ BUDGETS TAB ============ -->
+  <div class="tab-pane" data-pane="budgets" hidden>
+    <div class="gb-grid">
+      <!-- LEFT: budget form (new / edit) -->
+      <section class="gb-panel">
+        <h3 style="margin:0" id="budgetFormTitle">New budget</h3>
+        <form id="budgetForm" novalidate>
+          <label class="field">
+            <span>budgetScope</span>
+            <select class="input" id="bdScope" name="budgetScope">
+              <option value="MONTH">MONTH</option>
+              <option value="WEEK">WEEK</option>
+              <option value="CUSTOM">CUSTOM</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>targetType</span>
+            <select class="input" id="bdTarget" name="targetType">
+              <option value="CATEGORY">CATEGORY (單一類別)</option>
+              <option value="TOTAL">TOTAL (整體支出)</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>categoryId <small>(nullable for TOTAL)</small></span>
+            <select class="input" id="bdCategory" name="categoryId"></select>
+          </label>
+          <label class="field">
+            <span>budgetAmount</span>
+            <input class="input" id="bdAmount" name="budgetAmount" type="number" min="0" step="1" placeholder="8000" required/>
+          </label>
+          <div class="row" style="gap:10px">
+            <label class="field" style="flex:1">
+              <span>startDate</span>
+              <input class="input" id="bdStart" name="startDate" type="date" required/>
+            </label>
+            <label class="field" style="flex:1">
+              <span>endDate</span>
+              <input class="input" id="bdEnd" name="endDate" type="date" required/>
+            </label>
+          </div>
+          <div class="form-spacer"></div>
+          <div class="row" style="gap:8px;margin-top:4px">
+            <button type="button" class="btn danger" id="budgetDeleteBtn" style="display:none;justify-content:center;padding:6px 12px">🗑 Delete</button>
+            <button type="button" class="btn" id="budgetCancelBtn" style="flex:1;justify-content:center">Cancel</button>
+            <button type="submit" class="btn primary" id="budgetSubmitBtn" style="flex:1;justify-content:center">Save budget</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- RIGHT: budget cards + table -->
+      <section class="gb-panel">
+        <div class="goal-cards" id="budgetCards"></div>
+        <div class="gb-table-host">
+          <table class="wire">
+            <thead>
+              <tr>
+                <th>budgetScope</th><th>targetType</th><th>categoryId</th>
+                <th>budgetAmount</th><th>used</th><th>startDate</th><th>endDate</th>
+              </tr>
+            </thead>
+            <tbody id="budgetTableBody">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">讀取中…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="wp-pager" id="budgetsPager"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<div data-wp-tweaks></div>
+
+<script src="./shared.js"></script>
+<script src="./api.js"></script>
+<script>
+/* ==============================================================
+   Goals & Budgets — 串接:
+     GET /api/saving-goals    (saving_goals table)
+     GET /api/budgets         (budget table)
+     GET /api/accounts        (account selector)
+     GET /api/categories      (budget category selector)
+
+   SavingGoal (對齊 SQL saving_goals):
+     { savingGoalId, goalName, targetAmount, startDate, endDate,
+       userId, accountId, saved_amount? }   // saved_amount 由後端計算
+
+   Budget (對齊 SQL budget):
+     { budgetId, userId, budgetScope, categoryId, targetType,
+       budgetAmount, startDate, endDate, usedAmount? }
+   ============================================================== */
+const fmt = WalletPet.format;
+
+/* ---------- demo data ---------- */
+const demoGoals = [
+  { savingGoalId: 'g1', goalName: '🏝 日本旅行',    targetAmount: 120000, saved_amount: 54600, accountId: 3, startDate: '2026-02-01', endDate: '2027-03-15' },
+  { savingGoalId: 'g2', goalName: '💻 新筆電',      targetAmount:  66000, saved_amount: 48000, accountId: 4, startDate: '2026-09-01', endDate: '2026-12-01' },
+  { savingGoalId: 'g3', goalName: '🛟 緊急備用金',  targetAmount:  90000, saved_amount: 21000, accountId: 5, startDate: '2026-01-01', endDate: '2026-12-31' },
+  { savingGoalId: 'g4', goalName: '🚗 汽車頭款',    targetAmount: 200000, saved_amount: 76000, accountId: 6, startDate: '2026-03-01', endDate: '2027-06-30' },
+  { savingGoalId: 'g5', goalName: '📷 新相機',      targetAmount:  45000, saved_amount: 18200, accountId: 7, startDate: '2026-04-01', endDate: '2026-10-31' },
+  { savingGoalId: 'g6', goalName: '💍 紀念日禮物',  targetAmount:  25000, saved_amount: 22000, accountId: 8, startDate: '2026-01-15', endDate: '2026-06-15' },
+  { savingGoalId: 'g7', goalName: '🏠 裝潢基金',    targetAmount: 150000, saved_amount: 32000, accountId: 9, startDate: '2026-02-15', endDate: '2027-08-31' },
+  { savingGoalId: 'g8', goalName: '📚 進修學費',    targetAmount:  80000, saved_amount: 60000, accountId: 10, startDate: '2025-12-01', endDate: '2026-07-31' },
+];
+const demoBudgets = [
+  { budgetId: 'b1', budgetScope: 'MONTH', targetType: 'CATEGORY', categoryId: 'ES001', budgetAmount:  8000, usedAmount:  5420, startDate: '2026-04-01', endDate: '2026-04-30' },
+  { budgetId: 'b2', budgetScope: 'MONTH', targetType: 'CATEGORY', categoryId: 'ES005', budgetAmount:  2500, usedAmount:  2900, startDate: '2026-04-01', endDate: '2026-04-30' },
+  { budgetId: 'b3', budgetScope: 'MONTH', targetType: 'TOTAL',    categoryId: null,    budgetAmount: 90000, usedAmount: 72540, startDate: '2026-04-01', endDate: '2026-04-30' },
+  { budgetId: 'b4', budgetScope: 'MONTH', targetType: 'CATEGORY', categoryId: 'ES004', budgetAmount:  3500, usedAmount:  1200, startDate: '2026-04-01', endDate: '2026-04-30' },
+  { budgetId: 'b5', budgetScope: 'MONTH', targetType: 'CATEGORY', categoryId: 'ES006', budgetAmount:  4000, usedAmount:  3160, startDate: '2026-04-01', endDate: '2026-04-30' },
+  { budgetId: 'b6', budgetScope: 'WEEK',  targetType: 'CATEGORY', categoryId: 'ES001', budgetAmount:  2000, usedAmount:  1840, startDate: '2026-04-14', endDate: '2026-04-20' },
+  { budgetId: 'b7', budgetScope: 'WEEK',  targetType: 'TOTAL',    categoryId: null,    budgetAmount: 20000, usedAmount: 16240, startDate: '2026-04-14', endDate: '2026-04-20' },
+  { budgetId: 'b8', budgetScope: 'CUSTOM',targetType: 'CATEGORY', categoryId: 'ES002', budgetAmount: 10000, usedAmount:  4690, startDate: '2026-04-01', endDate: '2026-06-30' },
+  { budgetId: 'b9', budgetScope: 'MONTH', targetType: 'CATEGORY', categoryId: 'ES003', budgetAmount: 20000, usedAmount: 18000, startDate: '2026-04-01', endDate: '2026-04-30' },
+];
+const demoAccounts = [
+  { accountId: 3, accountName: '🏛 旅行基金帳戶' },
+  { accountId: 4, accountName: '💻 筆電基金帳戶' },
+  { accountId: 5, accountName: '🛟 緊急備用金' },
+];
+const demoCategories = [
+  { categoryId: 'ES001', categoryName: '飲食', icon: '🍜', categoryType: 'EXPENSE' },
+  { categoryId: 'ES005', categoryName: '娛樂', icon: '🎬', categoryType: 'EXPENSE' },
+  { categoryId: 'ES004', categoryName: '交通', icon: '🚇', categoryType: 'EXPENSE' },
+];
+
+const state = {
+  goals: [], budgets: [], accounts: [], categories: [], currentTab: 'goals',
+  editingGoalId: null,
+  editingBudgetId: null,
+};
+const goalsPager   = WalletPet.createPager({ pageSize: 4 });
+const budgetsPager = WalletPet.createPager({ pageSize: 4 });
+
+/** 依視窗寬度動態調整 pager 每頁筆數:桌機 4 / 手機橫向 3 */
+function adjustPagerSize() {
+  const size = window.matchMedia('(max-width: 899px)').matches ? 3 : 4;
+  goalsPager.pageSize   = size;
+  budgetsPager.pageSize = size;
+}
+adjustPagerSize();
+window.addEventListener('resize', () => {
+  adjustPagerSize();
+  renderGoals();
+  renderBudgets();
+});
+
+/* ---------- tab switching ---------- */
+document.querySelectorAll('.t-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    const tab = b.dataset.tab;
+    state.currentTab = tab;
+    document.querySelectorAll('.t-btn').forEach(x => x.classList.toggle('active', x.dataset.tab === tab));
+    document.querySelectorAll('.tab-pane').forEach(p => p.hidden = p.dataset.pane !== tab);
+  });
+});
+
+/* ---------- Goals rendering ---------- */
+function renderGoals() {
+  goalsPager.setItems(state.goals);
+  const visible = goalsPager.visible();
+
+  const cards = visible.map(g => {
+    const ratio = g.targetAmount ? g.saved_amount / g.targetAmount : 0;
+    const pct = Math.min(ratio, 1.2);
+    const sel = g.savingGoalId === state.editingGoalId ? ' selected' : '';
+    return `<div class="card${sel}" data-goal-id="${g.savingGoalId}">
+      <h3>${g.goalName}</h3>
+      <div class="kpi"><span class="n">${fmt.money(g.saved_amount)}</span><span class="l">/ ${fmt.money(g.targetAmount)}</span></div>
+      <div class="bar${ratio > 1 ? ' over' : ''}"><i style="width:${(pct*100).toFixed(0)}%"></i></div>
+      <div class="mini-stat"><span>${fmt.percent(ratio)}</span><span>→ ${fmt.date(g.endDate)}</span></div>
+    </div>`;
+  }).join('');
+  document.getElementById('goalCards').innerHTML = cards ||
+    '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px">尚未建立任何目標</div>';
+
+  const rows = visible.map(g => {
+    const sel = g.savingGoalId === state.editingGoalId ? ' class="selected"' : '';
+    return `<tr${sel} data-goal-id="${g.savingGoalId}">
+      <td>${g.goalName}</td>
+      <td>${fmt.money(g.targetAmount)}</td>
+      <td>${fmt.money(g.saved_amount)}</td>
+      <td>#${g.accountId}</td>
+      <td>${fmt.date(g.startDate)}</td>
+      <td>${fmt.date(g.endDate)}</td>
+      <td style="text-align:right"><button class="btn sm" data-deposit="${g.savingGoalId}">+ 存入</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('goalTableBody').innerHTML = rows ||
+    '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">無目標</td></tr>';
+
+  goalsPager.renderInto('goalsPager', renderGoals);
+}
+
+/* ---------- Budgets rendering ---------- */
+function lookupCategory(id) { return state.categories.find(c => c.categoryId === id); }
+
+function renderBudgets() {
+  budgetsPager.setItems(state.budgets);
+  const visible = budgetsPager.visible();
+
+  const cards = visible.map(b => {
+    const ratio = b.budgetAmount ? b.usedAmount / b.budgetAmount : 0;
+    const pct = Math.min(ratio, 1.2);
+    const cat = lookupCategory(b.categoryId);
+    const title = b.targetType === 'TOTAL'
+      ? '🛒 TOTAL'
+      : (cat ? `${cat.icon} ${cat.categoryName}` : b.categoryId);
+    const over = ratio > 1;
+    const sel = b.budgetId === state.editingBudgetId ? ' selected' : '';
+    return `<div class="card${sel}" data-budget-id="${b.budgetId}">
+      <h3>${title}</h3>
+      <div class="kpi"><span class="n">${fmt.money(b.usedAmount)}</span><span class="l">/ ${fmt.money(b.budgetAmount)}</span></div>
+      <div class="bar stripe${over ? ' over' : ''}"><i style="width:${(pct*100).toFixed(0)}%"></i></div>
+      <div class="mini-stat">
+        <span class="${over ? 'amt-neg' : ''}">${fmt.percent(ratio)}${over ? ' · over' : ''}</span>
+        <span>→ ${fmt.date(b.endDate)}</span>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('budgetCards').innerHTML = cards ||
+    '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px">尚未建立任何預算</div>';
+
+  const rows = visible.map(b => {
+    const cat = lookupCategory(b.categoryId);
+    const catLabel = b.categoryId ? (cat ? `${cat.icon} ${cat.categoryName}` : b.categoryId) : '—';
+    const used = Number(b.usedAmount);
+    const over = used > Number(b.budgetAmount);
+    const sel = b.budgetId === state.editingBudgetId ? ' class="selected"' : '';
+    return `<tr${sel} data-budget-id="${b.budgetId}">
+      <td>${b.budgetScope}</td>
+      <td>${b.targetType}</td>
+      <td>${catLabel}</td>
+      <td>${fmt.money(b.budgetAmount)}</td>
+      <td class="${over ? 'amt-neg' : ''}">${fmt.money(used)}</td>
+      <td>${fmt.date(b.startDate)}</td>
+      <td>${fmt.date(b.endDate)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('budgetTableBody').innerHTML = rows ||
+    '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">無預算</td></tr>';
+
+  budgetsPager.renderInto('budgetsPager', renderBudgets);
+}
+
+/* ---------- populate selects ---------- */
+function populateAccountSelect() {
+  document.getElementById('goalAccount').innerHTML = state.accounts
+    .map(a => `<option value="${a.accountId}">#${a.accountId} ${a.accountName}</option>`)
+    .join('');
+}
+function populateBudgetCategorySelect() {
+  const expenseCats = state.categories.filter(c => c.categoryType === 'EXPENSE');
+  document.getElementById('bdCategory').innerHTML = expenseCats
+    .map(c => `<option value="${c.categoryId}">${c.icon || ''} ${c.categoryName}</option>`)
+    .join('');
+}
+
+/* ========================================================
+   Goal form: new / edit / delete
+   ======================================================== */
+function enterGoalEditMode(g) {
+  state.editingGoalId = g.savingGoalId;
+  document.getElementById('goalFormTitle').textContent = 'Edit: ' + g.goalName;
+  document.getElementById('goalName').value   = g.goalName;
+  document.getElementById('goalTarget').value = g.targetAmount;
+  document.getElementById('goalAccount').value= g.accountId;
+  document.getElementById('goalStart').value  = g.startDate;
+  document.getElementById('goalEnd').value    = g.endDate;
+  document.getElementById('goalSubmitBtn').textContent = 'Save changes';
+  document.getElementById('goalDeleteBtn').style.display = 'inline-flex';
+  renderGoals();   // 重繪讓 selected 高亮生效
+}
+
+function resetGoalForm() {
+  state.editingGoalId = null;
+  document.getElementById('goalFormTitle').textContent = 'New goal';
+  document.getElementById('goalForm').reset();
+  document.getElementById('goalStart').value = fmt.today();
+  document.getElementById('goalSubmitBtn').textContent = 'Save goal';
+  document.getElementById('goalDeleteBtn').style.display = 'none';
+  renderGoals();
+}
+
+/* 點 card 或 row 進入 edit mode */
+document.getElementById('goalCards').addEventListener('click', e => {
+  const card = e.target.closest('[data-goal-id]');
+  if (!card) return;
+  const g = state.goals.find(x => String(x.savingGoalId) === card.dataset.goalId);
+  if (g) enterGoalEditMode(g);
+});
+document.getElementById('goalTableBody').addEventListener('click', e => {
+  // + 存入 按鈕另外處理,不進 edit
+  if (e.target.closest('[data-deposit]')) return;
+  const tr = e.target.closest('tr[data-goal-id]');
+  if (!tr) return;
+  const g = state.goals.find(x => String(x.savingGoalId) === tr.dataset.goalId);
+  if (g) enterGoalEditMode(g);
+});
+
+/* Cancel */
+document.getElementById('goalCancelBtn').addEventListener('click', resetGoalForm);
+
+/* Delete */
+document.getElementById('goalDeleteBtn').addEventListener('click', async () => {
+  if (!state.editingGoalId) return;
+  const g = state.goals.find(x => x.savingGoalId === state.editingGoalId);
+  if (!g) return;
+  if (!confirm(`確認刪除目標「${g.goalName}」? 此操作無法復原。`)) return;
+  try {
+    await WalletPet.savingGoalApi.remove(state.editingGoalId);
+  } catch (ex) {
+    console.warn('[goals] 刪除失敗, 本地模擬');
+  }
+  state.goals = state.goals.filter(x => x.savingGoalId !== state.editingGoalId);
+  resetGoalForm();
+});
+
+/* Submit: create or update */
+document.getElementById('goalForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = {
+    goalName:     document.getElementById('goalName').value.trim(),
+    targetAmount: Number(document.getElementById('goalTarget').value),
+    accountId:    Number(document.getElementById('goalAccount').value),
+    startDate:    document.getElementById('goalStart').value,
+    endDate:      document.getElementById('goalEnd').value,
+  };
+
+  if (state.editingGoalId) {
+    // UPDATE
+    try {
+      const updated = await WalletPet.savingGoalApi.update(state.editingGoalId, body);
+      const idx = state.goals.findIndex(x => x.savingGoalId === state.editingGoalId);
+      if (idx >= 0) state.goals[idx] = updated || { ...state.goals[idx], ...body };
+    } catch (ex) {
+      console.warn('[goals] 更新失敗, 本地模擬');
+      const idx = state.goals.findIndex(x => x.savingGoalId === state.editingGoalId);
+      if (idx >= 0) state.goals[idx] = { ...state.goals[idx], ...body };
+    }
+  } else {
+    // CREATE
+    try {
+      const created = await WalletPet.savingGoalApi.create(body);
+      state.goals.push(created);
+    } catch (ex) {
+      console.warn('[goals] 新增失敗, 本地模擬');
+      state.goals.push({
+        savingGoalId: 'g_local_' + Date.now(),
+        saved_amount: 0,
+        ...body,
+      });
+    }
+  }
+  resetGoalForm();
+});
+
+
+/* ========================================================
+   Budget form: new / edit / delete
+   ======================================================== */
+function enterBudgetEditMode(b) {
+  state.editingBudgetId = b.budgetId;
+  const cat = lookupCategory(b.categoryId);
+  const label = b.targetType === 'TOTAL' ? '🛒 TOTAL'
+              : (cat ? `${cat.icon} ${cat.categoryName}` : b.categoryId);
+  document.getElementById('budgetFormTitle').textContent = 'Edit: ' + label;
+  document.getElementById('bdScope').value  = b.budgetScope;
+  document.getElementById('bdTarget').value = b.targetType;
+  const catSel = document.getElementById('bdCategory');
+  if (b.targetType === 'TOTAL') {
+    catSel.disabled = true;
+    catSel.required = false;
+  } else {
+    catSel.disabled = false;
+    catSel.required = true;
+    catSel.value = b.categoryId || '';
+  }
+  document.getElementById('bdAmount').value = b.budgetAmount;
+  document.getElementById('bdStart').value  = b.startDate;
+  document.getElementById('bdEnd').value    = b.endDate;
+  document.getElementById('budgetSubmitBtn').textContent = 'Save changes';
+  document.getElementById('budgetDeleteBtn').style.display = 'inline-flex';
+  renderBudgets();
+}
+
+function resetBudgetForm() {
+  state.editingBudgetId = null;
+  document.getElementById('budgetFormTitle').textContent = 'New budget';
+  document.getElementById('budgetForm').reset();
+  document.getElementById('bdStart').value = fmt.today();
+  // 重設 category 的 disabled 狀態
+  const bdTarget = document.getElementById('bdTarget');
+  const catSel = document.getElementById('bdCategory');
+  catSel.disabled = bdTarget.value === 'TOTAL';
+  catSel.required = bdTarget.value !== 'TOTAL';
+  document.getElementById('budgetSubmitBtn').textContent = 'Save budget';
+  document.getElementById('budgetDeleteBtn').style.display = 'none';
+  renderBudgets();
+}
+
+/* 點 card 或 row 進入 edit mode */
+document.getElementById('budgetCards').addEventListener('click', e => {
+  const card = e.target.closest('[data-budget-id]');
+  if (!card) return;
+  const b = state.budgets.find(x => String(x.budgetId) === card.dataset.budgetId);
+  if (b) enterBudgetEditMode(b);
+});
+document.getElementById('budgetTableBody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-budget-id]');
+  if (!tr) return;
+  const b = state.budgets.find(x => String(x.budgetId) === tr.dataset.budgetId);
+  if (b) enterBudgetEditMode(b);
+});
+
+/* Cancel */
+document.getElementById('budgetCancelBtn').addEventListener('click', resetBudgetForm);
+
+/* Delete */
+document.getElementById('budgetDeleteBtn').addEventListener('click', async () => {
+  if (!state.editingBudgetId) return;
+  const b = state.budgets.find(x => x.budgetId === state.editingBudgetId);
+  if (!b) return;
+  const cat = lookupCategory(b.categoryId);
+  const label = b.targetType === 'TOTAL' ? 'TOTAL' : (cat ? cat.categoryName : b.categoryId);
+  if (!confirm(`確認刪除預算「${label}」(${b.budgetScope})? 此操作無法復原。`)) return;
+  try {
+    await WalletPet.budgetApi.remove(state.editingBudgetId);
+  } catch (ex) {
+    console.warn('[budgets] 刪除失敗, 本地模擬');
+  }
+  state.budgets = state.budgets.filter(x => x.budgetId !== state.editingBudgetId);
+  resetBudgetForm();
+});
+
+/* Submit: create or update */
+document.getElementById('budgetForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const scope     = document.getElementById('bdScope').value;
+  const target    = document.getElementById('bdTarget').value;
+  const categoryId= target === 'TOTAL' ? null : document.getElementById('bdCategory').value;
+  const body = {
+    budgetScope:  scope,
+    targetType:   target,
+    categoryId:   categoryId,
+    budgetAmount: Number(document.getElementById('bdAmount').value),
+    startDate:    document.getElementById('bdStart').value,
+    endDate:      document.getElementById('bdEnd').value,
+  };
+
+  if (state.editingBudgetId) {
+    // UPDATE
+    try {
+      const updated = await WalletPet.budgetApi.update(state.editingBudgetId, body);
+      const idx = state.budgets.findIndex(x => x.budgetId === state.editingBudgetId);
+      if (idx >= 0) state.budgets[idx] = updated || { ...state.budgets[idx], ...body };
+    } catch (ex) {
+      console.warn('[budgets] 更新失敗, 本地模擬');
+      const idx = state.budgets.findIndex(x => x.budgetId === state.editingBudgetId);
+      if (idx >= 0) state.budgets[idx] = { ...state.budgets[idx], ...body };
+    }
+  } else {
+    // CREATE
+    try {
+      const created = await WalletPet.budgetApi.create(body);
+      state.budgets.push(created);
+    } catch (ex) {
+      console.warn('[budgets] 新增失敗, 本地模擬');
+      state.budgets.push({
+        budgetId: 'b_local_' + Date.now(),
+        usedAmount: 0,
+        ...body,
+      });
+    }
+  }
+  resetBudgetForm();
+});
+
+/* ---------- targetType 切換時,control categoryId 是否 required ---------- */
+document.getElementById('bdTarget').addEventListener('change', e => {
+  const catSel = document.getElementById('bdCategory');
+  catSel.disabled = e.target.value === 'TOTAL';
+  catSel.required = e.target.value !== 'TOTAL';
+});
+
+/* ---------- init ---------- */
+async function init() {
+  // 預設日期
+  const today = fmt.today();
+  document.getElementById('goalStart').value = today;
+  document.getElementById('bdStart').value = today;
+
+  try { state.accounts   = await WalletPet.accountApi.list(); }      catch { state.accounts   = demoAccounts; }
+  try { state.categories = await WalletPet.categoryApi.list(); }     catch { state.categories = demoCategories; }
+  try { state.goals      = await WalletPet.savingGoalApi.list(); }   catch { state.goals      = demoGoals; }
+  try { state.budgets    = await WalletPet.budgetApi.list(); }       catch { state.budgets    = demoBudgets; }
+
+  populateAccountSelect();
+  populateBudgetCategorySelect();
+  renderGoals();
+  renderBudgets();
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WalletPet — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./shared.css">
+<style>
+  /* ========== Dashboard layout ========== */
+  .dash-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:14px;
+    flex:1;min-height:0;
+  }
+  /* 三張卡比例:本月 1 / Recent 1.4 / Cash flow 1 */
+  .dash-rail{
+    display:flex;flex-direction:column;gap:12px;
+    min-width:0;min-height:0;overflow:hidden;
+  }
+  .dash-rail .card{
+    display:flex;flex-direction:column;min-height:0;padding:14px 16px;
+  }
+  .card-month   { flex: 1 1 0; }
+  .card-recent  { flex: 1.4 1 0; }
+  .card-cashflow{ flex: 1 1 0; }
+
+  .pet-stage.rive-clean{position:relative}
+
+  /* ========== 統一卡片頭部 ========== */
+  .card-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    gap:8px;margin-bottom:10px;flex:0 0 auto;
+  }
+  .card-head h3{
+    margin:0;font-family:'Caveat';font-size:24px;font-weight:600;
+    line-height:1;
+  }
+  .card-head .card-sub{
+    font-family:'Kalam';font-size:11px;color:var(--muted);
+  }
+
+  /* ========== 本月卡 ========== */
+  .month-body{
+    display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;
+    justify-content:center;
+  }
+  /* 3 欄等寬 KPI: 支出 / 收入 / 淨額 */
+  .month-kpi{
+    display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;
+  }
+  .kpi-cell{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .kpi-cell .kpi-label{
+    font-family:'Kalam';font-size:11px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.5px;
+  }
+  .kpi-cell .kpi-value{
+    font-family:'Caveat';font-size:26px;font-weight:700;line-height:1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  /* 預算區塊 */
+  .budget-block{display:flex;flex-direction:column;gap:4px}
+  .budget-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-family:'Kalam';font-size:12px;color:var(--ink-soft);
+  }
+  .budget-row .b-pct{font-family:'Caveat';font-size:18px;color:var(--ink)}
+
+  /* 整張卡可點擊 (Recent → transactions) */
+  .card-link{
+    text-decoration:none;color:inherit;
+    transition:transform .08s ease;
+    cursor:pointer;
+  }
+  .card-link:hover{
+    transform:translate(-1px,-1px);
+    box-shadow:5px 5px 0 var(--ink);
+  }
+  .card-link:active{
+    transform:translate(1px,1px);
+    box-shadow:2px 2px 0 var(--ink);
+  }
+  /* 副標的 › 箭頭,只在 card-link 的 card-head 顯示 */
+  .card-link .card-sub{font-family:'Kalam';display:inline-flex;align-items:baseline;gap:2px}
+
+  /* ========== Recent 卡 ========== */
+  .recent-body{flex:1;min-height:0;overflow:auto;margin:0 -4px}
+  /* 每列 3 欄: 日期 | note | 金額 */
+  .recent-row{
+    display:grid;grid-template-columns: 48px 1fr auto;
+    gap:10px;align-items:center;
+    padding:6px 4px;
+    border-bottom:1px dashed rgba(42,38,34,.15);
+    font-family:'Kalam';font-size:13px;
+  }
+  .recent-row:last-child{border-bottom:0}
+  .r-date{font-size:11px;color:var(--muted);font-family:'Kalam'}
+  .r-note{
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .r-amt{
+    font-family:'Caveat';font-size:18px;font-weight:600;line-height:1;
+    white-space:nowrap;text-align:right;
+  }
+
+  /* ========== Cash flow 卡 ========== */
+  .cashflow-body{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
+  .cashflow-stat-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-family:'Kalam';font-size:12px;color:var(--ink-soft);
+  }
+  .cashflow-stat-row .cf-label{color:var(--muted);font-size:11px}
+  .cashflow-stat-row .cf-value{
+    font-family:'Caveat';font-size:18px;color:var(--ink);font-weight:600;
+  }
+  .cashflow-chart{
+    flex:1;min-height:80px;
+    border:1.5px dashed rgba(42,38,34,.3);
+    border-radius:8px;background:#fffaf2;
+    position:relative;overflow:hidden;
+  }
+  .cashflow-chart svg{width:100%;height:100%;display:block}
+
+  /* ========== 手機橫向 ========== */
+  @media (max-width: 899px){
+    .dash-grid{grid-template-columns:1fr 1fr;gap:6px}
+    /* 手機版: rail 不捲動, 三張卡緊湊塞進一頁 */
+    .dash-rail{gap:6px;overflow:hidden}
+    .dash-rail .card{padding:6px 8px}
+    /* 手機下 Cash flow 卡給多一點比例,確保圖表看得出形狀 */
+    .card-month   { flex: 1 1 0; }
+    .card-recent  { flex: 1.2 1 0; }    /* 從 1.4 降到 1.2 */
+    .card-cashflow{ flex: 1.2 1 0; }    /* 從 1 提到 1.2 */
+    .card-head{margin-bottom:3px}
+    .card-head h3{font-size:15px}
+    .card-head .card-sub{font-size:9px}
+    .month-body{gap:4px}
+    .month-kpi{gap:4px}
+    .kpi-cell .kpi-label{font-size:8px}
+    .kpi-cell .kpi-value{font-size:14px}
+    .budget-row{font-size:9px}
+    .budget-row .b-pct{font-size:11px}
+    /* Recent 列更緊湊 */
+    .recent-row{padding:2px 2px;font-size:10px;gap:4px;grid-template-columns:30px 1fr auto}
+    .r-date{font-size:8px}
+    .r-amt{font-size:12px}
+    /* Cash flow: stat 行縮小, 把空間讓給圖表 */
+    .cashflow-body{gap:4px}
+    .cashflow-stat-row{font-size:9px}
+    .cashflow-stat-row .cf-label{font-size:8px}
+    .cashflow-stat-row .cf-value{font-size:12px}
+    /* 手機下圖表給固定較大的最小高度,避免被壓扁成一條線 */
+    .cashflow-chart{min-height:56px;max-height:80px}
+    .pet-stage.rive-clean{aspect-ratio:auto;min-height:unset}
+  }
+</style>
+</head>
+<body>
+
+
+<main>
+  <h1 class="page-title" data-page="dashboard">Dashboard</h1>
+  <p class="page-sub">總覽目前財務狀況,並看看 Mochi 今天心情如何 · 資料來源: /api/charts/summary</p>
+
+  <div class="dash-grid">
+    <!-- Rive stage (左側) -->
+    <div class="pet-stage rive-clean" id="petStage">
+      <div class="rive-box-plain">Rive</div>
+      <a class="fab" href="transactions.html" aria-label="New transaction">+</a>
+    </div>
+
+    <!-- Right rail (右側) -->
+    <div class="dash-rail">
+
+      <!-- ===== 本月卡 ===== -->
+      <div class="card card-month">
+        <div class="card-head">
+          <h3>本月</h3>
+          <span class="card-sub" id="monthLabel">—</span>
+        </div>
+        <div class="month-body">
+          <!-- 三欄 KPI: 支出/收入/淨額 -->
+          <div class="month-kpi">
+            <div class="kpi-cell">
+              <span class="kpi-label">支出</span>
+              <span class="kpi-value amt-neg" id="monthExpense">—</span>
+            </div>
+            <div class="kpi-cell">
+              <span class="kpi-label">收入</span>
+              <span class="kpi-value amt-pos" id="monthIncome">—</span>
+            </div>
+            <div class="kpi-cell">
+              <span class="kpi-label">淨額</span>
+              <span class="kpi-value" id="monthNet">—</span>
+            </div>
+          </div>
+          <!-- 預算進度 -->
+          <div class="budget-block">
+            <div class="budget-row">
+              <span>Budget used</span>
+              <span class="b-pct" id="budgetPercent">—</span>
+            </div>
+            <div class="bar stripe"><i id="budgetBar" style="width:0%"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Recent 卡 (整張點擊 → transactions) ===== -->
+      <a href="transactions.html" class="card card-recent card-link" aria-label="前往 Transactions 頁">
+        <div class="card-head">
+          <h3>Recent</h3>
+          <span class="card-sub"><span id="recentCount">—</span> ›</span>
+        </div>
+        <div class="recent-body" id="recentTx">
+          <div style="text-align:center;color:var(--muted);font-size:13px;padding:12px">讀取中…</div>
+        </div>
+      </a>
+
+      <!-- ===== Cash flow 卡 ===== -->
+      <div class="card card-cashflow">
+        <div class="card-head">
+          <h3>Cash flow</h3>
+          <span class="card-sub">last 8 weeks</span>
+        </div>
+        <div class="cashflow-body">
+          <div class="cashflow-stat-row">
+            <span class="cf-label">週均淨額</span>
+            <span class="cf-value" id="cfAvg">—</span>
+          </div>
+          <div class="cashflow-chart">
+            <svg id="cashflowSvg" viewBox="0 0 400 100" preserveAspectRatio="none"></svg>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<div data-wp-tweaks></div>
+
+<script src="./shared.js"></script>
+<script src="./api.js"></script>
+<script>
+/* ==============================================================
+   Dashboard — /api/charts/summary + /api/charts/cashflow-line
+   ============================================================== */
+
+const demoSummary = {
+  month_income:  126000,
+  month_expense:  72540,
+  month_net:      53460,
+  budget_used_ratio: 0.68,
+  recent_transactions: [
+    { transactionId: 't1', transactionDate: '2026-04-20', note: '☕ Louisa Coffee', transactionAmount:    85, transactionType: 'EXPENSE' },
+    { transactionId: 't2', transactionDate: '2026-04-20', note: '🛒 全聯',         transactionAmount:   246, transactionType: 'EXPENSE' },
+    { transactionId: 't3', transactionDate: '2026-04-19', note: '💰 薪資',         transactionAmount: 63000, transactionType: 'INCOME'  },
+    { transactionId: 't4', transactionDate: '2026-04-19', note: '🚇 悠遊卡',       transactionAmount:   100, transactionType: 'EXPENSE' },
+    { transactionId: 't5', transactionDate: '2026-04-18', note: '🍜 一蘭拉麵',     transactionAmount:   320, transactionType: 'EXPENSE' },
+    { transactionId: 't6', transactionDate: '2026-04-17', note: '🎬 威秀',         transactionAmount:   320, transactionType: 'EXPENSE' },
+  ],
+};
+
+function renderSummary(s) {
+  const fmt = WalletPet.format;
+
+  // 月份 label
+  const now = new Date();
+  document.getElementById('monthLabel').textContent =
+    `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  // 三欄 KPI
+  document.getElementById('monthExpense').textContent = fmt.money(s.month_expense);
+  document.getElementById('monthIncome').textContent  = fmt.money(s.month_income);
+  const netEl = document.getElementById('monthNet');
+  netEl.textContent = fmt.money(s.month_net, 'TWD', { showSign: true });
+  netEl.classList.remove('amt-pos','amt-neg');
+  netEl.classList.add(s.month_net >= 0 ? 'amt-pos' : 'amt-neg');
+
+  // 預算
+  const ratio = Math.min(s.budget_used_ratio, 1.2);
+  document.getElementById('budgetPercent').textContent = fmt.percent(s.budget_used_ratio);
+  document.getElementById('budgetBar').style.width = (ratio * 100).toFixed(0) + '%';
+
+  // Recent 列表 (最多 6 筆)
+  const recent = (s.recent_transactions || []).slice(0, 6);
+  const rows = recent.map(tx => {
+    const isExp = tx.transactionType === 'EXPENSE';
+    const amt = (isExp ? -1 : 1) * Number(tx.transactionAmount);
+    return `<div class="recent-row">
+      <span class="r-date">${fmt.date(tx.transactionDate)}</span>
+      <span class="r-note">${tx.note || '—'}</span>
+      <span class="r-amt ${isExp ? 'amt-neg' : 'amt-pos'}">${fmt.money(amt, 'TWD', { showSign: true })}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('recentTx').innerHTML = rows ||
+    '<div style="text-align:center;color:var(--muted);padding:12px;font-size:13px">尚無交易</div>';
+  document.getElementById('recentCount').textContent = recent.length + ' entries';
+}
+
+function renderCashflow(points) {
+  const fmt = WalletPet.format;
+  const svg = document.getElementById('cashflowSvg');
+  const pts = points || [42, 55, 38, 62, 48, 70, 58, 75];
+
+  // 週均淨額 (demo: 每點 * 1000 代表一週淨額)
+  const avg = pts.reduce((a,b) => a+b, 0) / pts.length * 1000;
+  document.getElementById('cfAvg').textContent = fmt.money(avg, 'TWD', { showSign: true });
+
+  // 繪圖
+  const max = Math.max(...pts, 1);
+  const pad = 8;
+  const w = 400, h = 100;
+  const coords = pts.map((v, i) => [
+    pad + i * ((w - pad*2) / (pts.length - 1)),
+    h - pad - (v / max) * (h - pad*2)
+  ]);
+
+  const pathLine = coords.map((p, i) => (i === 0 ? 'M' : 'L') + p.join(',')).join(' ');
+  const pathArea = `M${coords[0][0]},${h-pad} ` + coords.map(p => 'L' + p.join(',')).join(' ') +
+                   ` L${coords[coords.length-1][0]},${h-pad} Z`;
+
+  svg.innerHTML = `
+    <path d="${pathArea}" fill="var(--accent)" opacity=".18"/>
+    <path d="${pathLine}" stroke="var(--accent)" stroke-width="2" fill="none"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    ${coords.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.5" fill="var(--accent)"/>`).join('')}
+  `;
+}
+
+async function loadDashboard() {
+  // 規格 4.5 Chart 模組:summary / cashflow-line 皆要求 startDate / endDate
+  // 預設取本月 1 日 ~ 今天
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const pad = n => String(n).padStart(2, '0');
+  const toIso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const range = { startDate: toIso(monthStart), endDate: toIso(today) };
+
+  try {
+    const s = await WalletPet.chartApi.summary(range);
+    renderSummary(s);
+  } catch (e) {
+    console.warn('[dashboard] 使用 demo 資料 (' + e.message + ')');
+    renderSummary(demoSummary);
+  }
+  try {
+    const cf = await WalletPet.chartApi.cashflowLine({ ...range, groupBy: 'DAY' });
+    // 規格回傳 [{ label, income, expense, balance }, ...],取 balance 當趨勢點
+    const points = Array.isArray(cf) ? cf.map(p => p.balance) : (cf && cf.points);
+    renderCashflow(points);
+  } catch {
+    renderCashflow();
+  }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

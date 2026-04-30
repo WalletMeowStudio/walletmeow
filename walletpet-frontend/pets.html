@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WalletPet — Pets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./shared.css">
+<style>
+  .pets-grid{
+    display:grid;grid-template-columns: 1fr 1fr;gap:12px;
+    flex:1;min-height:0;
+  }
+  .pet-stage-full{aspect-ratio:auto;min-height:0;display:flex;align-items:center;justify-content:center;background:var(--paper-deep);border:2px dashed var(--ink)}
+  .pet-stage-full .rive-label{font-family:'Caveat';font-size:56px;color:var(--muted)}
+  .pets-right{
+    display:flex;flex-direction:column;gap:10px;
+    min-width:0;min-height:0;overflow:hidden;
+  }
+  /* 四張卡:前兩張(身份+月曆)固定,互動列表彈性,Actions固定 */
+  .pets-right .card{flex:0 0 auto;padding:14px}
+  .pets-right .card.flex-card{
+    flex:1 1 auto;min-height:0;
+    display:flex;flex-direction:column;gap:8px;
+  }
+
+  /* mood strip — 每格一天,寬度自動適應 */
+  .mood-strip-compact{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(22px, 1fr));
+    gap:3px;margin-top:4px;
+  }
+  .mood-strip-compact > div{
+    aspect-ratio:1;max-width:26px;
+    border:1.5px solid var(--ink);border-radius:4px;
+    font-family:'Kalam';font-size:9px;display:grid;place-items:center;color:#00000090;
+    cursor:default;
+  }
+  .mood-strip-compact > div.today{outline:2px solid var(--ink);outline-offset:1px}
+  .mood-strip-compact > div.future{opacity:.25}
+
+  /* event details list */
+  .event-rows{
+    display:flex;flex-direction:column;gap:4px;
+    flex:1;min-height:0;overflow:auto;
+  }
+
+  /* 可編輯的寵物名字 */
+  .pet-name-editable{
+    margin:0;cursor:pointer;
+    border-bottom:1.5px dashed transparent;
+    transition:border-color .15s ease;
+    padding:0 2px;border-radius:4px;
+  }
+  .pet-name-editable:hover{
+    border-bottom-color:var(--ink-soft);
+    background:rgba(232,100,58,.06);
+  }
+  .pet-name-editable:focus{outline:none}
+  .pet-name-editable:hover::after{
+    content:" ✎";
+    font-size:14px;color:var(--muted);vertical-align:middle;
+    font-family:'Kalam';
+  }
+  /* 編輯中的 input */
+  .pet-name-input{
+    font-family:'Caveat';font-size:26px;font-weight:600;line-height:1;
+    color:var(--ink);background:#fff;
+    border:2px solid var(--accent);border-radius:6px;
+    padding:2px 8px;margin:0;
+    min-width:120px;max-width:220px;
+    outline:none;
+    box-shadow:2px 2px 0 var(--ink);
+  }
+  .event-row{
+    display:grid;grid-template-columns:70px 1fr 55px 60px;gap:8px;
+    align-items:center;padding:4px 8px;
+    border:1.5px solid rgba(42,38,34,.12);border-radius:8px;
+    background:rgba(255,255,255,.82);
+    font-family:'Kalam';font-size:13px;
+  }
+  .ev-time{font-size:11px;color:var(--muted);white-space:nowrap}
+  .ev-type{font-family:'Caveat';font-size:16px;line-height:1}
+  .ev-mood{text-align:right;font-family:'Caveat';font-size:16px;line-height:1}
+  .ev-reward{text-align:right;font-size:10px;color:var(--muted)}
+  .ev-empty{text-align:center;padding:14px;color:var(--muted);font-size:13px}
+
+  /* Actions 按鈕壓低高度 */
+  .pets-right .card .btn{padding:6px 10px;font-size:17px}
+
+  /* 手機版點選某天展開 events (桌機隱藏) */
+  .mobile-day-events{display:none}
+
+  @media (max-width: 899px){
+    .pets-grid{grid-template-columns:1fr 1fr;gap:6px}
+    .pet-stage-full .rive-label{font-size:32px}
+    /* 手機版: 右側 4 張卡緊湊塞進一頁 */
+    .pets-right{gap:4px;overflow:hidden;position:relative}
+    .pets-right .card{padding:4px 6px;flex:0 0 auto}
+    /* Recent interactions 整張卡手機隱藏 */
+    .pets-right .card.flex-card{display:none}
+    /* Actions 卡 (最後一張可見的卡) 拉長到對齊左側 Rive 底部 */
+    .pets-right .card:last-of-type{
+      flex:1 1 auto;min-height:0;
+      display:flex;flex-direction:column;
+    }
+    .pets-right .card:last-of-type .grid.g-2{
+      flex:1;align-content:center;       /* 按鈕在卡內垂直置中 */
+    }
+    .pets-right .card h3{font-size:12px;margin-bottom:1px}
+    /* Actions 4 鈕 */
+    .pets-right .card .btn{padding:2px 4px;font-size:11px;min-height:auto}
+    .pets-right .grid.g-2{gap:3px !important}
+    .mood-strip-compact{grid-template-columns:repeat(7, 1fr);gap:3px}
+    .mood-strip-compact > div{max-width:none;font-size:10px;cursor:pointer}
+    .mood-strip-compact > div.selected{
+      outline:2px solid var(--accent);
+      outline-offset:1px;
+    }
+    /* 手機專用: 展開當天 events — 浮動覆蓋所有右側卡片 */
+    .mobile-day-events{
+      display:block;
+      position:absolute;
+      top:0;left:0;right:0;bottom:0;    /* 佔滿整個 pets-right 容器 */
+      z-index:100;
+      padding:8px;
+      border:2px solid var(--ink);
+      border-radius:12px;
+      background:#fffaf2;
+      box-shadow:3px 3px 0 var(--ink);
+      overflow-y:auto;
+    }
+    .mobile-day-events[hidden]{display:none}
+    .mde-header{
+      display:flex;justify-content:space-between;align-items:center;
+      margin-bottom:6px;
+      padding-bottom:4px;
+      border-bottom:1.5px dashed var(--ink-soft);
+    }
+    .mde-date{
+      font-family:'Caveat';font-size:16px;font-weight:700;
+    }
+    .mde-close{
+      border:2px solid var(--ink);background:#fff;
+      border-radius:6px;width:22px;height:22px;
+      font-size:11px;line-height:1;cursor:pointer;
+      display:grid;place-items:center;padding:0;
+      box-shadow:1px 1px 0 var(--ink);
+    }
+    .mde-list{
+      display:flex;flex-direction:column;gap:3px;
+    }
+    .mde-row{
+      display:grid;grid-template-columns:44px 1fr auto;gap:4px;
+      font-size:11px;line-height:1.3;
+      padding:4px 6px;
+      background:rgba(255,255,255,.85);border-radius:6px;
+      border:1px solid rgba(42,38,34,.1);
+    }
+    .mde-row .mde-time{color:var(--muted);font-size:10px}
+    .mde-row .mde-type{font-size:11px}
+    .mde-row .mde-delta{color:var(--accent);font-size:11px;font-weight:700}
+    .mde-empty{
+      font-size:11px;color:var(--muted);text-align:center;padding:12px 0;
+    }
+    /* 名字/since/mood bar 更緊湊 */
+    .pet-name-editable{font-size:16px !important}
+    .pet-name-input{font-size:16px}
+  }
+</style>
+</head>
+<body>
+
+
+<main>
+  <h1 class="page-title" data-page="pets">Pets</h1>
+  <p class="page-sub">與寵物互動 · 資料表: pets + pet_events · API: /api/pets/me · /api/pets/interact · /api/pets/reward-by-bookkeeping</p>
+
+  <div class="pets-grid">
+    <!-- LEFT: Rive stage -->
+    <div class="pet-stage pet-stage-full">
+      <div class="rive-label">Rive</div>
+    </div>
+
+    <!-- RIGHT: identity / mood / events / actions -->
+    <div class="pets-right">
+      <!-- 身分卡 -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:baseline;gap:8px">
+          <h3 class="pet-name-editable" id="petName" title="點擊編輯名字" tabindex="0">—</h3>
+          <span style="font-family:'Kalam';font-size:12px;color:var(--muted)">since <span id="petSince">—</span></span>
+        </div>
+        <div style="margin-top:8px">
+          <!-- 順序: 🥫 Cancan 在左、Mood 在右,對齊下方 Actions 按鈕 (-1 / +1) 的左右配置 -->
+          <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:3px">
+            <span class="cancan-stat" title="罐罐:餵食/大餐用,記帳每筆 +1 (每日上限 +5)">
+              <span style="font-family:'Kalam';font-size:12px;color:var(--muted)">🥫 Cancan</span>
+              <span id="cancanNum" style="font-family:'Caveat';font-size:20px;font-weight:600;margin-left:4px">—</span>
+            </span>
+            <span style="font-family:'Kalam';font-size:12px;color:var(--muted)">Mood</span>
+          </div>
+          <div class="bar"><i id="moodBar" style="width:0%"></i></div>
+          <div class="mini-stat" style="margin-top:3px"><span id="moodNum">— / 100</span><span id="moodTime">—</span></div>
+        </div>
+      </div>
+
+      <!-- Mood this month -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h3 style="margin:0" id="moodMonthTitle">Mood this month</h3>
+          <div class="legend" style="font-size:11px">
+            <span><i style="background:#3f8a4a"></i>super(80+)</span>
+            <span><i style="background:#6aa35d"></i>happy(60+)</span>
+            <span><i style="background:#e8c55a"></i>angry(30+)</span>
+            <span><i style="background:var(--accent)"></i>crying</span>
+          </div>
+        </div>
+        <div id="moodStrip" class="mood-strip-compact"></div>
+      </div>
+
+      <!-- Recent interactions (pet_events) -->
+      <div class="card flex-card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h3 style="margin:0">Recent interactions</h3>
+          <small style="font-family:'Kalam';font-size:11px;color:var(--muted)" id="eventCount">—</small>
+        </div>
+        <div class="event-rows" id="eventList">
+          <div class="ev-empty">讀取中…</div>
+        </div>
+        <div class="wp-pager" id="eventsPager"></div>
+      </div>
+
+      <!-- Actions: cancan 系統 4 鈕 (每日 +3 mood 上限套在前 3 個) -->
+      <div class="card">
+        <h3>Actions <small style="font-family:'Kalam';font-size:11px;color:var(--muted);font-weight:400">餵食受每日 +3 mood 上限</small></h3>
+        <div class="grid g-2" style="gap:8px">
+          <button class="btn" data-feed="CAN"   data-cost="1"  data-mood="1"  style="justify-content:center;padding:10px">🥫 餵罐罐 (-1 / +1)</button>
+          <button class="btn" data-feed="FISH"  data-cost="1"  data-mood="1"  style="justify-content:center;padding:10px">🐟 餵小魚乾 (-1 / +1)</button>
+          <button class="btn" data-feed="SNACK" data-cost="1"  data-mood="1"  style="justify-content:center;padding:10px">🍪 餵零食 (-1 / +1)</button>
+          <button class="btn" data-feed="FEAST" data-cost="10" data-mood="15" style="justify-content:center;padding:10px">🍽 大餐 (-10 / +15)</button>
+        </div>
+      </div>
+
+      <!-- 手機專用浮層: 點某天展開當天 events (覆蓋整個 pets-right) -->
+      <div id="mobileDayEvents" class="mobile-day-events" hidden>
+        <div class="mde-header">
+          <span class="mde-date" id="mdeDateLabel">—</span>
+          <button type="button" class="mde-close" id="mdeCloseBtn" aria-label="關閉">✕</button>
+        </div>
+        <div class="mde-list" id="mdeList"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div data-wp-tweaks></div>
+
+<script src="./shared.js"></script>
+<script src="./api.js"></script>
+<script>
+/* ==============================================================
+   Pets page — 串接 (規格 4.5 Pet 模組,共 3 隻):
+     GET  /api/pets/me                                                -> PetResponse
+     POST /api/pets/interact             body: { interactionType }    -> PetResponse
+     POST /api/pets/reward-by-bookkeeping body: { transactionId, eventType } -> PetResponse
+     (規格未定義事件列表 / 改名端點,事件月曆與寵物改名暫只走本地 demo)
+
+   PetResponse (對齊 SQL pets):
+     { petId, userId, petName, mood, lastUpdateAt,
+       isDisplayed, createdAt, modelId }
+
+   PetEvent (對齊 SQL pet_events):
+     { petEventId, userId, petId, eventType, moodDelta,
+       reward, createdAt }     // createdAt = 'yyyy-MM-ddTHH:mm:ss'
+
+   約定的 eventType 值:
+     PET | MUSIC | ACHIEVEMENT | CHAT | BOOKKEEPING
+   ============================================================== */
+const fmt = WalletPet.format;
+
+/* event_type 與後端 PetServiceImpl 常數對齊;reward 欄位用於展示用提示文字 */
+const EVENT_META = {
+  /* cancan 系統 */
+  FEED_CAN:     { icon: '🥫', label: '餵罐罐' },
+  FEED_FISH:    { icon: '🐟', label: '餵小魚乾' },
+  FEED_SNACK:   { icon: '🍪', label: '餵零食' },
+  FEED_FEAST:   { icon: '🍽', label: '大餐' },
+  BOOKKEEPING:  { icon: '📝', label: '記帳獎勵' },
+  LOGIN_STREAK: { icon: '🔥', label: '連續登入' },
+  LOGIN_MISS:   { icon: '💤', label: '缺席扣血' },
+  /* legacy 互動類型,後端 v1.0 仍接受 */
+  PET:          { icon: '🧶', label: '擼擼' },
+  MUSIC:        { icon: '🎵', label: '播音樂' },
+  ACHIEVEMENT:  { icon: '🎉', label: '成就' },
+  CHAT:         { icon: '💬', label: '對話' },
+};
+
+/* feed 按鈕 → 對應 PetEvent 的事件型別 + 預期 delta(後端會做最終裁切) */
+const FEED_TO_EVENT = {
+  CAN:   { eventType: 'FEED_CAN',   moodDelta: 1,  cancanDelta: -1 },
+  FISH:  { eventType: 'FEED_FISH',  moodDelta: 1,  cancanDelta: -1 },
+  SNACK: { eventType: 'FEED_SNACK', moodDelta: 1,  cancanDelta: -1 },
+  FEAST: { eventType: 'FEED_FEAST', moodDelta: 15, cancanDelta: -10 },
+};
+
+const demoPet = {
+  petId: 'p_default', petName: 'Mochi',
+  mood: 60,        // spec 預設 60
+  cancan: 12,      // demo 給一些罐罐讓按鈕能玩
+  lastUpdateAt: '2026-04-21T08:14:00',
+  createdAt: '2026-02-10T00:00:00',
+  modelId: 1,
+};
+
+/* demo pet_events: 模擬資料庫回傳。事件類型對齊 cancan 系統。
+   以「今天」為錨點往回生成,確保:
+     - 手機版近 7 天視窗 (today-6 ~ today) 都有資料可點
+     - 桌機完整月曆也有早期歷史紀錄
+   跨月日期會被過濾掉。 */
+function genDemoEvents() {
+  const today = new Date();
+  const y = today.getFullYear(), m = today.getMonth(), d0 = today.getDate();
+  // delta 設定對齊後端規則
+  const deltas = {
+    FEED_CAN:    { mood: 1,  cancan: -1 },
+    FEED_FISH:   { mood: 1,  cancan: -1 },
+    FEED_SNACK:  { mood: 1,  cancan: -1 },
+    FEED_FEAST:  { mood: 15, cancan: -10 },
+    BOOKKEEPING: { mood: 0,  cancan: 1 },
+  };
+  const rewards = {
+    FEED_CAN: null, FEED_FISH: null, FEED_SNACK: null, FEED_FEAST: null,
+    BOOKKEEPING: '📝 記帳 +1',
+  };
+  // 以 offset(=幾天前)定義事件,而非寫死月份的某一天
+  // offset 0~6 是手機近 7 天視窗,9/12/15 給桌機看更早的歷史
+  const offsetSets = [
+    { offset: 0, types: ['FEED_CAN', 'BOOKKEEPING', 'BOOKKEEPING'] },
+    { offset: 1, types: ['FEED_FISH', 'BOOKKEEPING'] },
+    { offset: 2, types: ['FEED_CAN', 'FEED_SNACK', 'BOOKKEEPING'] },
+    { offset: 3, types: ['BOOKKEEPING', 'BOOKKEEPING'] },
+    { offset: 4, types: ['FEED_FEAST', 'BOOKKEEPING'] },
+    { offset: 5, types: ['FEED_CAN', 'BOOKKEEPING'] },
+    { offset: 6, types: ['FEED_SNACK', 'BOOKKEEPING'] },
+    { offset: 9,  types: ['FEED_FEAST', 'BOOKKEEPING'] },
+    { offset: 12, types: ['FEED_FISH', 'FEED_CAN', 'BOOKKEEPING'] },
+    { offset: 15, types: ['BOOKKEEPING', 'FEED_CAN'] },
+  ];
+  const base = [];
+  let idCounter = 1000;
+  offsetSets.forEach(({ offset, types }) => {
+    const date = new Date(y, m, d0 - offset);
+    // 跨月就跳過(讓 renderMoodMonth 的本月過濾邏輯不會多包不該有的資料)
+    if (date.getFullYear() !== y || date.getMonth() !== m) return;
+    const day = date.getDate();
+    types.forEach((type, idx) => {
+      const hour = 9 + idx * 3;
+      const min  = (day * 7 + idx * 11) % 60;
+      const d = deltas[type] || { mood: 0, cancan: 0 };
+      base.push({
+        petEventId: idCounter++,
+        userId: 'demo',
+        petId: 'p_default',
+        eventType: type,
+        moodDelta: d.mood,
+        cancanDelta: d.cancan,
+        reward: rewards[type],
+        createdAt: `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')}:00`,
+      });
+    });
+  });
+  return base.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+const eventsPager = WalletPet.createPager({ pageSize: 5 });
+function adjustPagerSize() {
+  eventsPager.pageSize = window.matchMedia('(max-width: 899px)').matches ? 3 : 5;
+}
+adjustPagerSize();
+window.addEventListener('resize', () => {
+  adjustPagerSize();
+  // 切回桌機時清除手機選中狀態
+  if (!window.matchMedia('(max-width: 899px)').matches) {
+    state.selectedDay = null;
+    const mde = document.getElementById('mobileDayEvents');
+    if (mde) mde.hidden = true;
+  }
+  renderEvents();
+  renderMoodMonth();   // 響應桌機/手機切換,重繪 mood 格子
+});
+
+/* 綁 mood strip 點擊: 手機版展開當天 events */
+document.addEventListener('DOMContentLoaded', () => {
+  const strip = document.getElementById('moodStrip');
+  if (strip) {
+    strip.addEventListener('click', e => {
+      if (!window.matchMedia('(max-width: 899px)').matches) return;
+      const cell = e.target.closest('[data-day]');
+      if (!cell) return;
+      if (cell.classList.contains('future')) return;
+      const day = Number(cell.dataset.day);
+      // 再次點已選中的日期 → 收起
+      state.selectedDay = (state.selectedDay === day) ? null : day;
+      if (state.selectedDay == null) {
+        document.getElementById('mobileDayEvents').hidden = true;
+      }
+      renderMoodMonth();
+    });
+  }
+  const closeBtn = document.getElementById('mdeCloseBtn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      state.selectedDay = null;
+      document.getElementById('mobileDayEvents').hidden = true;
+      renderMoodMonth();
+    });
+  }
+});
+
+const state = { pet: null, events: [], selectedDay: null };
+
+function renderPet(p) {
+  document.getElementById('petName').textContent   = p.petName;
+  document.getElementById('petSince').textContent  = fmt.date(p.createdAt, 'full');
+  document.getElementById('moodBar').style.width   = p.mood + '%';
+  document.getElementById('moodNum').textContent   = p.mood + ' / 100';
+  document.getElementById('moodTime').textContent  =
+    fmt.date(p.lastUpdateAt) + ' ' + fmt.time(p.lastUpdateAt);
+  const cancanEl = document.getElementById('cancanNum');
+  if (cancanEl) cancanEl.textContent = (typeof p.cancan === 'number') ? p.cancan : '—';
+  // 同步 header mood + cancan chip + localStorage 快取(其他頁也會讀到)
+  if (WalletPet.updatePetStatus)      WalletPet.updatePetStatus(p);
+  else if (WalletPet.updateMood)      WalletPet.updateMood(p.mood);
+  state.pet = p;
+}
+
+/* renderMoodMonth — 當月每一天一格
+   邏輯: 從當前 mood 反推月初值, 逐日套用 moodDelta 得出每日結尾的 mood */
+function renderMoodMonth() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayDay = now.getDate();
+  const monthLabel = `${year}-${String(month+1).padStart(2,'0')}`;
+
+  // 手機橫向螢幕下只顯示近 7 天,桌機顯示全月
+  const isSmall = window.matchMedia('(max-width: 899px)').matches;
+  const windowDays = isSmall ? 7 : daysInMonth;
+
+  // 標題依模式切換
+  const title = isSmall
+    ? `Mood · last ${Math.min(windowDays, todayDay)} days`
+    : `Mood · ${monthLabel} (${daysInMonth} 天)`;
+  document.getElementById('moodMonthTitle').textContent = title;
+
+  // 本月事件按日分組
+  const eventsByDay = {};
+  state.events.forEach(ev => {
+    const m = ev.createdAt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return;
+    if (Number(m[1]) !== year || Number(m[2]) !== month + 1) return;
+    const day = Number(m[3]);
+    if (!eventsByDay[day]) eventsByDay[day] = [];
+    eventsByDay[day].push(ev);
+  });
+
+  // 反推月初 mood
+  const totalDelta = state.events
+    .filter(ev => {
+      const m = ev.createdAt.match(/^(\d{4})-(\d{2})/);
+      return m && Number(m[1]) === year && Number(m[2]) === month + 1;
+    })
+    .reduce((s, ev) => s + (ev.moodDelta || 0), 0);
+  const currentMood = state.pet ? state.pet.mood : 50;
+  let runningMood = Math.max(0, Math.min(100, currentMood - totalDelta));
+
+  // 逐日計算整個月 (以便反推)
+  const dailyMood = {};
+  for (let d = 1; d <= daysInMonth; d++) {
+    (eventsByDay[d] || []).forEach(ev => {
+      runningMood = Math.max(0, Math.min(100, runningMood + (ev.moodDelta || 0)));
+    });
+    dailyMood[d] = runningMood;
+  }
+
+  // 決定要渲染的日期範圍
+  //   桌機: 1 ~ daysInMonth (完整月曆)
+  //   手機: max(1, today-6) ~ today (近 7 天,不顯示未來)
+  let startDay, endDay;
+  if (isSmall) {
+    endDay = todayDay;
+    startDay = Math.max(1, todayDay - 6);
+  } else {
+    startDay = 1;
+    endDay = daysInMonth;
+  }
+
+  // 渲染
+  const strip = document.getElementById('moodStrip');
+  strip.innerHTML = '';
+  for (let d = startDay; d <= endDay; d++) {
+    const cell = document.createElement('div');
+    const isFuture = d > todayDay;
+    const isToday = d === todayDay;
+    if (isFuture) {
+      cell.classList.add('future');
+      cell.style.background = '#ece4d2';
+    } else {
+      const mv = dailyMood[d];
+      // 對齊 spec 的 5 段表情閾值: 0 crying / 30 angry / 60 default / 80 happy / 100 super_happy
+      cell.style.background = mv >= 80 ? '#3f8a4a'    // super_happy
+                          : mv >= 60 ? '#6aa35d'    // happy / default
+                          : mv >= 30 ? '#e8c55a'    // angry
+                          : 'var(--accent)';        // crying
+    }
+    if (isToday) cell.classList.add('today');
+    cell.textContent = d;
+    cell.dataset.day = d;     // 給 click handler 讀取
+    if (d === state.selectedDay) cell.classList.add('selected');
+    cell.title = `${monthLabel}-${String(d).padStart(2,'0')}` +
+      (isFuture ? ' · (未來)'
+                : ` · mood ${dailyMood[d]}` +
+                  (eventsByDay[d] ? ` · ${eventsByDay[d].length} 次互動` : ' · 無互動'));
+    strip.appendChild(cell);
+  }
+
+  // 手機版: 如果有選中的某天, 更新展開區塊
+  if (isSmall && state.selectedDay != null) {
+    renderMobileDayEvents(state.selectedDay, year, month, eventsByDay);
+  }
+}
+
+/* 手機版: 渲染當天 events 到展開區塊 */
+function renderMobileDayEvents(day, year, month, eventsByDay) {
+  const container = document.getElementById('mobileDayEvents');
+  const label = document.getElementById('mdeDateLabel');
+  const list = document.getElementById('mdeList');
+  if (!container) return;
+
+  const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  label.textContent = dateStr;
+
+  const dayEvents = eventsByDay[day] || [];
+  if (dayEvents.length === 0) {
+    list.innerHTML = '<div class="mde-empty">當日無互動紀錄</div>';
+  } else {
+    list.innerHTML = dayEvents.map(ev => {
+      const m = ev.createdAt.match(/(\d{2}:\d{2})/);
+      const time = m ? m[1] : '';
+      const meta = EVENT_META[ev.eventType] || { icon: '•', label: ev.eventType };
+      const delta = ev.moodDelta > 0 ? `+${ev.moodDelta}`
+                  : ev.moodDelta < 0 ? `${ev.moodDelta}` : '—';
+      return `<div class="mde-row">
+        <span class="mde-time">${time}</span>
+        <span class="mde-type">${meta.icon} ${meta.label}</span>
+        <span class="mde-delta">${delta}</span>
+      </div>`;
+    }).join('');
+  }
+  container.hidden = false;
+}
+
+/* renderEvents — 本月互動列表 + pager */
+function renderEvents() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const monthEvents = state.events.filter(ev => {
+    const m = ev.createdAt.match(/^(\d{4})-(\d{2})/);
+    return m && Number(m[1]) === year && Number(m[2]) === month;
+  });
+
+  eventsPager.setItems(monthEvents);
+  const visible = eventsPager.visible();
+
+  const listEl = document.getElementById('eventList');
+  if (!visible.length) {
+    listEl.innerHTML = '<div class="ev-empty">本月尚無互動紀錄</div>';
+  } else {
+    listEl.innerHTML = visible.map(ev => {
+      const meta = EVENT_META[ev.eventType] || { icon: '·', label: ev.eventType };
+      const delta = ev.moodDelta || 0;
+      const deltaClass = delta > 0 ? 'amt-pos' : (delta < 0 ? 'amt-neg' : '');
+      const deltaStr = delta > 0 ? `+${delta}` : String(delta);
+      return `<div class="event-row" data-event-id="${ev.petEventId}">
+        <div class="ev-time">${fmt.date(ev.createdAt)} ${fmt.time(ev.createdAt)}</div>
+        <div class="ev-type">${meta.icon} ${meta.label}</div>
+        <div class="ev-mood ${deltaClass}">${deltaStr}</div>
+        <div class="ev-reward">${ev.reward || '—'}</div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('eventCount').textContent = `本月 ${monthEvents.length} 次`;
+  eventsPager.renderInto('eventsPager', renderEvents);
+}
+
+/* 載入 */
+async function loadPet() {
+  try {
+    state.pet = await WalletPet.petApi.me();
+  } catch (e) {
+    console.warn('[pets] 使用 demo pet');
+    state.pet = demoPet;
+  }
+  renderPet(state.pet);
+}
+
+async function loadEvents() {
+  // 規格 4.5 Pet 模組沒定義「列出事件」端點;暫時用 demo 事件,
+  // 後續若要真資料,需與後端討論補 GET /api/pet-events 或在 interact / reward 回應中帶最新事件
+  console.warn('[pets] 規格未定義 pet-events 端點,使用 demo events');
+  state.events = genDemoEvents();
+  renderMoodMonth();
+  renderEvents();
+}
+
+/* Actions: cancan 系統 4 鈕 → POST /api/pets/feed
+   - CAN / FISH / SNACK : -1 cancan, +1 mood (受每日 +3 mood 上限)
+   - FEAST              : -10 cancan, +15 mood (不受每日 mood 上限)
+   後端會做最終的 cancan 餘額檢查、每日上限裁切;失敗時 fallback 到本地 demo */
+document.querySelectorAll('[data-feed]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const feedType = btn.dataset.feed;
+    const meta = FEED_TO_EVENT[feedType];
+    if (!meta) return;
+
+    // 先做本地餘額檢查避免無謂送 request
+    if (state.pet && typeof state.pet.cancan === 'number'
+        && state.pet.cancan + meta.cancanDelta < 0) {
+      alert('罐罐不夠囉,先去記帳賺幾顆吧 🥫');
+      return;
+    }
+
+    try {
+      const result = await WalletPet.petApi.feed({
+        userId: state.pet?.userId || 'demo',
+        petId : state.pet?.petId  || 'p_default',
+        feedType,
+      });
+      if (result && typeof result.mood === 'number') {
+        state.pet = result;
+        renderPet(result);
+      }
+      await loadEvents();
+    } catch (ex) {
+      // 本地 fallback: 套用 delta + 簡單模擬「每日 +3 mood」上限
+      console.warn('[pets] feed 失敗,本地模擬', ex);
+      const nowIso = new Date().toISOString().slice(0, 19);
+      const todayPrefix = nowIso.slice(0, 10);
+
+      let moodDelta = meta.moodDelta;
+      if (feedType !== 'FEAST') {
+        // 統計今天 FEED_CAN/FISH/SNACK 已加多少 mood
+        const gainedToday = state.events
+          .filter(ev => ev.createdAt.startsWith(todayPrefix)
+                  && ['FEED_CAN','FEED_FISH','FEED_SNACK'].includes(ev.eventType))
+          .reduce((s, ev) => s + (ev.moodDelta || 0), 0);
+        moodDelta = Math.max(0, Math.min(meta.moodDelta, 3 - gainedToday));
+      }
+
+      state.events.unshift({
+        petEventId: Date.now(),
+        userId: state.pet?.userId || 'demo',
+        petId : state.pet?.petId  || 'p_default',
+        eventType: meta.eventType,
+        moodDelta,
+        cancanDelta: meta.cancanDelta,
+        reward: null,
+        createdAt: nowIso,
+      });
+      if (state.pet) {
+        state.pet.mood = Math.max(0, Math.min(100, state.pet.mood + moodDelta));
+        state.pet.cancan = Math.max(0, (state.pet.cancan || 0) + meta.cancanDelta);
+        state.pet.lastUpdateAt = nowIso;
+        renderPet(state.pet);
+      }
+      eventsPager.goTo(1);
+      renderMoodMonth();
+      renderEvents();
+    }
+  });
+});
+
+/* ========== 編輯寵物名字 ==========
+   互動: 點擊名字 -> 變輸入框 -> Enter/失焦儲存 / Esc 取消
+   後端: PUT /api/pets/me  body: { petName }
+*/
+function setupNameEdit() {
+  const nameEl = document.getElementById('petName');
+  if (!nameEl) return;
+
+  function startEdit() {
+    if (nameEl.tagName === 'INPUT') return;  // 已經在編輯中
+    const currentName = state.pet?.petName || nameEl.textContent.trim();
+    if (currentName === '—') return;  // 未載入完成時不讓編輯
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'pet-name-input';
+    input.id = 'petName';
+    input.value = currentName;
+    input.maxLength = 45;  // SQL petName varchar(45)
+    input.setAttribute('aria-label', '編輯寵物名字');
+
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    let cancelled = false;
+
+    async function commit() {
+      if (cancelled) return;
+      const newName = input.value.trim();
+      const noChange = newName === currentName;
+
+      if (!newName || noChange) {
+        // 還原顯示,不呼叫 API
+        restoreDisplay(currentName);
+        return;
+      }
+
+      // 樂觀更新:先換回顯示
+      restoreDisplay(newName);
+
+      // 規格 4.5 Pet 模組沒定義「更新寵物名稱」端點,目前僅本地端記錄。
+      // 後續若需要持久化,需與後端討論補 PUT /api/pets/me 或新增 rename 端點。
+      console.warn('[pets] 規格未定義更新名稱端點,僅在本地端 state 記錄');
+      if (state.pet) state.pet.petName = newName;
+    }
+
+    function restoreDisplay(name) {
+      const h3 = document.createElement('h3');
+      h3.className = 'pet-name-editable';
+      h3.id = 'petName';
+      h3.title = '點擊編輯名字';
+      h3.tabIndex = 0;
+      h3.textContent = name;
+      input.replaceWith(h3);
+      // 重新綁定點擊事件 (因為是新元素)
+      setupNameEdit();
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();   // 觸發 blur -> commit
+      } else if (e.key === 'Escape') {
+        cancelled = true;
+        restoreDisplay(currentName);
+      }
+    });
+
+    input.addEventListener('blur', commit);
+  }
+
+  nameEl.addEventListener('click', startEdit);
+  // 鍵盤可存取性:按 Enter 也能觸發
+  nameEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      startEdit();
+    }
+  });
+}
+
+/* init */
+(async function init() {
+  await loadPet();
+  await loadEvents();
+  setupNameEdit();
+})();
+</script>
+</body>
+</html>
