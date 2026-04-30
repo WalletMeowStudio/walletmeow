@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Map;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,7 +24,7 @@ import com.walletpet.security.CurrentUserUtil;
 import com.walletpet.service.TransactionService;
 
 import lombok.RequiredArgsConstructor;
-
+@CrossOrigin(origins = "http://127.0.0.1:5500", allowedHeaders = "*", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/transactions")
 @RequiredArgsConstructor

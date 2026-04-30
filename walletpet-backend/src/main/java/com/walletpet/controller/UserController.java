@@ -8,7 +8,7 @@ import com.walletpet.security.CurrentUserUtil;
 import com.walletpet.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
+@CrossOrigin(origins = "http://127.0.0.1:5500", allowedHeaders = "*", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor

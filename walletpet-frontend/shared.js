@@ -49,7 +49,7 @@ WalletPet.format = {
     if (!m) return iso;
     const [, y, mo, d] = m;
     if (style === 'full') return `${y}-${mo}-${d}`;
-    if (style === 'md')   return `${parseInt(mo)}/${parseInt(d)}`;
+    if (style === 'md') return `${parseInt(mo)}/${parseInt(d)}`;
     return `${mo}-${d}`;
   },
 
@@ -84,10 +84,10 @@ WalletPet.format = {
    ========================================================= */
 WalletPet.constants = {
   TRANSACTION_TYPE: { EXPENSE: 'EXPENSE', INCOME: 'INCOME' },
-  CATEGORY_TYPE:    { EXPENSE: 'EXPENSE', INCOME: 'INCOME' },
-  BUDGET_SCOPE:     { MONTH: 'MONTH', WEEK: 'WEEK', CUSTOM: 'CUSTOM' },
-  BUDGET_TARGET:    { CATEGORY: 'CATEGORY', TOTAL: 'TOTAL' },
-  USER_ROLE:        { USER: 'USER', ADMIN: 'ADMIN' },
+  CATEGORY_TYPE: { EXPENSE: 'EXPENSE', INCOME: 'INCOME' },
+  BUDGET_SCOPE: { MONTH: 'MONTH', WEEK: 'WEEK', CUSTOM: 'CUSTOM' },
+  BUDGET_TARGET: { CATEGORY: 'CATEGORY', TOTAL: 'TOTAL' },
+  USER_ROLE: { USER: 'USER', ADMIN: 'ADMIN' },
   CURRENCY_DEFAULT: 'TWD',
 };
 
@@ -98,7 +98,7 @@ WalletPet.constants = {
    - 認證: JWT in localStorage
    - 回傳格式: ApiResponse<T> = { success, message, data }
    ========================================================= */
-WalletPet.api = (function(){
+WalletPet.api = (function () {
   const BASE_URL = 'http://localhost:8080/walletpet';
   const TOKEN_KEY = 'walletpet.jwt';
 
@@ -155,12 +155,12 @@ WalletPet.api = (function(){
     baseUrl: BASE_URL,
     tokenKey: TOKEN_KEY,
     getToken, setToken, clearToken,
-    get:  (path)       => request('GET',    path),
-    post: (path, body) => request('POST',   path, body),
-    put:  (path, body) => request('PUT',    path, body),
-    del:  (path)       => request('DELETE', path),
+    get: (path) => request('GET', path),
+    post: (path, body) => request('POST', path, body),
+    put: (path, body) => request('PUT', path, body),
+    del: (path) => request('DELETE', path),
     postForm: (path, body) => request('POST', path, body, { form: true }),
-    putForm:  (path, body) => request('PUT', path, body, { form: true }),
+    putForm: (path, body) => request('PUT', path, body, { form: true }),
     qs,
   };
 })();
@@ -169,13 +169,13 @@ WalletPet.api = (function(){
 /* =========================================================
    4. MOOD STRIP (pets/dashboard 共用)
    ========================================================= */
-WalletPet.renderMoodStrip = function(stripId, moods) {
+WalletPet.renderMoodStrip = function (stripId, moods) {
   const strip = document.getElementById(stripId);
   if (!strip) return;
-  const defaults = ['#6aa35d','#6aa35d','#e8c55a','#6aa35d','#e8643a','#6aa35d',
-                    '#e8c55a','#6aa35d','#6aa35d','#e8c55a','#6aa35d','#6aa35d',
-                    '#e8643a','#e8c55a','#6aa35d','#6aa35d','#e8c55a','#6aa35d',
-                    '#6aa35d','#e8643a'];
+  const defaults = ['#6aa35d', '#6aa35d', '#e8c55a', '#6aa35d', '#e8643a', '#6aa35d',
+    '#e8c55a', '#6aa35d', '#6aa35d', '#e8c55a', '#6aa35d', '#6aa35d',
+    '#e8643a', '#e8c55a', '#6aa35d', '#6aa35d', '#e8c55a', '#6aa35d',
+    '#6aa35d', '#e8643a'];
   const list = moods || defaults;
   strip.innerHTML = '';
   list.forEach((c, i) => {
@@ -190,7 +190,7 @@ WalletPet.renderMoodStrip = function(stripId, moods) {
 /* =========================================================
    5. TWEAKS PANEL (開發用視覺調整,正式版可隱藏)
    ========================================================= */
-WalletPet.initTweaks = function() {
+WalletPet.initTweaks = function () {
   const defaults = {
     accent: '#e8643a', accentSoft: '#ffd9c8',
     sketchy: true, compact: false, labels: true,
@@ -222,7 +222,7 @@ WalletPet.initTweaks = function() {
   apply();
 
   function persist(edits) {
-    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*'); } catch(e){}
+    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*'); } catch (e) { }
   }
 
   document.querySelectorAll('#swatches .sw').forEach(s => {
@@ -238,14 +238,14 @@ WalletPet.initTweaks = function() {
   const lb = document.getElementById('labels');
   if (sk) sk.addEventListener('change', e => { state.sketchy = e.target.checked; apply(); persist({ sketchy: state.sketchy }); });
   if (cp) cp.addEventListener('change', e => { state.compact = e.target.checked; apply(); persist({ compact: state.compact }); });
-  if (lb) lb.addEventListener('change', e => { state.labels  = e.target.checked; apply(); persist({ labels:  state.labels  }); });
+  if (lb) lb.addEventListener('change', e => { state.labels = e.target.checked; apply(); persist({ labels: state.labels }); });
 
   window.addEventListener('message', (e) => {
     const d = e.data || {};
-    if (d.type === '__activate_edit_mode')   tweaksEl.classList.add('open');
+    if (d.type === '__activate_edit_mode') tweaksEl.classList.add('open');
     if (d.type === '__deactivate_edit_mode') tweaksEl.classList.remove('open');
   });
-  try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch(e){}
+  try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch (e) { }
 };
 
 
@@ -258,7 +258,7 @@ WalletPet.initTweaks = function() {
      pg.visible();                   // 取得當前頁資料
      pg.renderInto(hostId, onChange) // 渲染 < 1 2 3 > 按鈕
    ========================================================= */
-WalletPet.createPager = function(opts = {}) {
+WalletPet.createPager = function (opts = {}) {
   const state = {
     items: [],
     pageSize: opts.pageSize || 10,
@@ -351,7 +351,7 @@ WalletPet.createPager = function(opts = {}) {
    LOGOUT — 清 JWT + user,回到 login 頁
    其他頁面無法直接呼叫,只能透過 toolbar 選單
    ========================================================= */
-WalletPet.logout = function() {
+WalletPet.logout = function () {
   try {
     // 1. 清 token (localStorage)
     if (WalletPet.api && WalletPet.api.clearToken) {
@@ -365,7 +365,7 @@ WalletPet.logout = function() {
     // 3. (可選) 通知後端 — 如果後端有 /api/auth/logout endpoint 可解除 token
     //    目前後端分工文件沒規劃,先保留空殼以利未來啟用
     //    try { await WalletPet.api.post('/api/auth/logout'); } catch(e){}
-  } catch(e) {
+  } catch (e) {
     console.warn('[logout] 清除本地資料失敗', e);
   }
   // 4. 導回登入頁 (用 replace 不留歷史紀錄,避免按上一頁回到登入後的頁)
@@ -373,7 +373,7 @@ WalletPet.logout = function() {
 };
 
 
-WalletPet.initPageNav = function() {
+WalletPet.initPageNav = function () {
   const kebabBtn = document.getElementById('kebabBtn');
   const menu = document.getElementById('kebabMenu');
   if (!kebabBtn || !menu) return;
@@ -426,17 +426,17 @@ WalletPet.PAGES = [
   { value: 'logout',       label: '🚪 Logout', isLogout: true },
 ];
 
-WalletPet.renderHeader = function(currentPage) {
+WalletPet.renderHeader = function (currentPage) {
   // 找錨點元素 (1) 優先用顯式指定的 [data-wp-toolbar-anchor] (login 頁用)
   //          (2) 否則自動注入到 .page-title (所有其他頁預設行為)
   //          (3) 最後 fallback 到舊的 [data-wp-toolbar] placeholder
   const explicitAnchor = document.querySelector('[data-wp-toolbar-anchor]');
-  const pageTitle      = document.querySelector('main > .page-title');
-  const legacyHost     = document.querySelector('[data-wp-toolbar]') || document.querySelector('[data-wp-header]');
-  const anchor         = explicitAnchor || pageTitle;
+  const pageTitle = document.querySelector('main > .page-title');
+  const legacyHost = document.querySelector('[data-wp-toolbar]') || document.querySelector('[data-wp-header]');
+  const anchor = explicitAnchor || pageTitle;
 
   const page = currentPage ||
-    (anchor   && anchor.getAttribute('data-page')) ||
+    (anchor && anchor.getAttribute('data-page')) ||
     (legacyHost && legacyHost.getAttribute('data-page')) ||
     '';
 
@@ -486,7 +486,7 @@ WalletPet.renderHeader = function(currentPage) {
   }
 };
 
-WalletPet.renderTweaksPanel = function() {
+WalletPet.renderTweaksPanel = function () {
   const host = document.querySelector('[data-wp-tweaks]');
   if (!host) return;
   host.outerHTML = `
@@ -515,7 +515,7 @@ WalletPet.renderTweaksPanel = function() {
      - 'walletpet.mood' 存最新的 pet mood (每次 interact / petApi.me 後更新)
    這樣各頁 header 的 mood chip 都能顯示正確值
    ========================================================= */
-WalletPet.refreshHeaderUser = function() {
+WalletPet.refreshHeaderUser = function () {
   // avatar 首字
   try {
     const stored = localStorage.getItem('walletpet.user');
@@ -524,7 +524,7 @@ WalletPet.refreshHeaderUser = function() {
       const av = document.getElementById('userAvatar');
       if (av && u.userName) av.textContent = u.userName[0].toUpperCase();
     }
-  } catch(e) {}
+  } catch (e) { }
 
   // mood chip: 優先讀 walletpet.mood,沒有再 fallback 到 user.mood
   const mc = document.getElementById('moodChip');
@@ -539,7 +539,7 @@ WalletPet.refreshHeaderUser = function() {
       try {
         const u = JSON.parse(localStorage.getItem('walletpet.user') || '{}');
         if (typeof u.mood === 'number') mood = u.mood;
-      } catch(e) {}
+      } catch (e) { }
     }
     mc.textContent = mood === null ? '🐾 mood —' : `🐾 mood ${mood}`;
   }
@@ -557,21 +557,21 @@ WalletPet.refreshHeaderUser = function() {
       try {
         const u = JSON.parse(localStorage.getItem('walletpet.user') || '{}');
         if (typeof u.cancan === 'number') cancan = u.cancan;
-      } catch(e) {}
+      } catch (e) { }
     }
     cc.textContent = cancan === null ? '🥫 cancan —' : `🥫 cancan ${cancan}`;
   }
 };
 
 /** 任何頁面更新 pet 後呼叫這個,同步 header chip + localStorage */
-WalletPet.updateMood = function(newMood) {
+WalletPet.updateMood = function (newMood) {
   if (typeof newMood !== 'number') return;
   localStorage.setItem('walletpet.mood', String(newMood));
   const mc = document.getElementById('moodChip');
   if (mc) mc.textContent = `🐾 mood ${newMood}`;
 };
 
-WalletPet.updateCancan = function(newCancan) {
+WalletPet.updateCancan = function (newCancan) {
   if (typeof newCancan !== 'number') return;
   localStorage.setItem('walletpet.cancan', String(newCancan));
   const cc = document.getElementById('cancanChip');
@@ -579,7 +579,7 @@ WalletPet.updateCancan = function(newCancan) {
 };
 
 /** 一次套用 PetResponse 的 mood + cancan，並寫回 localStorage / header chip。 */
-WalletPet.updatePetStatus = function(pet) {
+WalletPet.updatePetStatus = function (pet) {
   if (!pet || typeof pet !== 'object') return;
   if (typeof pet.mood === 'number') WalletPet.updateMood(pet.mood);
   if (typeof pet.cancan === 'number') WalletPet.updateCancan(pet.cancan);
@@ -600,14 +600,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // - pets 頁自己會 loadPet,這裡當作備援
   const mc = document.getElementById('moodChip');
   if (mc && WalletPet.petApi && typeof WalletPet.petApi.me === 'function') {
-  WalletPet.petApi.me()
-    .then(p => {
-      WalletPet.updatePetStatus(p);
-    })
-    .catch((e) => {
-      console.warn('[shared] pet status refresh failed', e);
-    });
-}
+    WalletPet.petApi.me()
+      .then(p => {
+        WalletPet.updatePetStatus(p);
+      })
+      .catch((e) => {
+        console.warn('[shared] pet status refresh failed', e);
+      });
+  }
 });
 
 window.WalletPet = WalletPet;
