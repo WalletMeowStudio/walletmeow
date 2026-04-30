@@ -10,12 +10,7 @@ import com.walletpet.entity.DailyRecordReward;
 
 public interface DailyRecordRewardRepository extends JpaRepository<DailyRecordReward, Long> {
 
-    Optional<DailyRecordReward> findByUser_UserIdAndRewardDate(
-            String userId,
-            LocalDate rewardDate
-    );
+    Optional<DailyRecordReward> findByUser_UserIdAndRewardDate(String userId,LocalDate rewardDate);
 
-    List<DailyRecordReward> findByUser_UserIdOrderByRewardDateDesc(
-            String userId
-    );
+    List<DailyRecordReward> findByUser_UserIdOrderByRewardDateDesc(String userId);
 }
