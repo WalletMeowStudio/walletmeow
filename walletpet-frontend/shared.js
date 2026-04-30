@@ -416,10 +416,10 @@ WalletPet.initPageNav = function() {
    ========================================================= */
 WalletPet.PAGES = [
   { value: 'dashboard',    label: '🏠 Dashboard' },
-  { value: 'transactions', label: '💸 Transactions' },
+  { value: 'transactions', label: '💸 我的記帳' },
   { value: 'accounts',     label: '🏦 Accounts' },
   { value: 'transfers',    label: '↔ Transfers' },
-  { value: 'categories',   label: '🏷 Categories' },
+  { value: 'categories',   label: '🏷 類別管理' },
   { value: 'goals',        label: '🎯 Goals & Budgets' },
   { value: 'pets',         label: '🐾 Pets' },
   { value: 'analytics',    label: '📊 Analytics' },

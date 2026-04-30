@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>WalletPet — Categories</title>
+<title>WalletPet — 類別管理</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./shared.css">
 <style>
-  /* 左 form + 右側 (tile 上 / table 下) */
+  /* 左 form + 右側 tile */
   .cat-grid{
     display:grid;grid-template-columns: minmax(280px, 360px) 1fr;gap:12px;
     flex:1;min-height:0;
@@ -20,6 +20,57 @@
     display:flex;flex-direction:column;padding:12px;gap:10px;min-width:0;min-height:0;
   }
   .cat-panel > form{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow:auto}
+  /* 收入 / 支出類別主題色 */
+  .cat-form-panel {
+    --cat-theme: #FDC0AE;
+    --cat-theme-soft: rgba(253, 192, 174, 0.32);
+  }
+  .cat-form-panel.cat-theme-expense {
+    --cat-theme: #FDC0AE;
+    --cat-theme-soft: rgba(253, 192, 174, 0.32);
+  }
+  .cat-form-panel.cat-theme-income {
+    --cat-theme: #C0DAB5;
+    --cat-theme-soft: rgba(192, 218, 181, 0.36);
+  }
+  .cat-form-panel {
+    background: var(--cat-theme-soft);
+  }
+  .cat-form-panel .btn.primary {
+    background: var(--cat-theme);
+    color: var(--ink);
+  }
+  .cat-form-panel .flag-row label:has(input:checked) {
+    background: var(--cat-theme);
+    border-color: var(--ink);
+  }
+  .cat-page.cat-theme-expense {
+    --cat-theme: #FDC0AE;
+    --cat-theme-soft: rgba(253, 192, 174, 0.32);
+  }
+  .cat-page.cat-theme-income {
+    --cat-theme: #C0DAB5;
+    --cat-theme-soft: rgba(192, 218, 181, 0.36);
+  }
+  .cat-page .seg-btn.active {
+    background: var(--cat-theme);
+  }
+  .cat-page .icon-picker button.selected,
+  .cat-page .color-palette button.selected {
+    border-color: var(--cat-theme);
+    background: var(--cat-theme-soft);
+  }
+  .cat-page .icon-picker button:hover {
+    border-color: var(--cat-theme);
+    background: var(--cat-theme-soft);
+  }
+  .cat-page .tile-grid .tile-add:hover {
+    border-color: var(--cat-theme);
+    color: var(--ink);
+    background: var(--cat-theme-soft);
+    box-shadow: 3px 3px 0 var(--cat-theme);
+    transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--accent);
+  }
   /* 右側上下分 */
   .cat-right{
     display:flex;flex-direction:column;gap:12px;
@@ -31,91 +82,109 @@
     display:flex;flex-direction:column;padding:12px;gap:8px;min-width:0;min-height:0;
   }
   .cat-tiles-section{flex:1 1 0}
-  .cat-table-section{flex:1 1 0}
 
   /* Tile grid — 每格固定大小, 少時靠左對齊不拉寬 */
   .tile-grid{
-    flex:1;min-height:0;
-    display:grid;grid-template-columns:repeat(auto-fill, 100px);gap:8px;
-    grid-auto-rows:84px;    /* 固定每列高度,跨 tab 大小一致 */
-    overflow:auto;padding:4px;align-content:start;justify-content:start;
+    flex:1;
+    min-height:0;
+    display:grid;
+
+    /* 橫向長方形：可放約 5 個中文字 */
+    grid-template-columns:repeat(auto-fill, 128px);
+    grid-auto-rows:58px;
+
+    gap:8px;
+    overflow:auto;
+    padding:4px;
+    align-content:start;
+    justify-content:start;
   }
-  /* categories 頁的 tile 改垂直排列(icon上/名字下),覆蓋 shared.css 預設水平 */
+
+  /* 類別 tile：icon 左、文字右 */
   .tile-grid .tile{
-    flex-direction:column;gap:6px;padding:8px;
-    cursor:pointer;transition:transform .08s;
-    text-align:center;
+    position:relative;
+    display:grid;
+    grid-template-columns:30px 1fr;
+    align-items:center;
+    gap:6px;
+
+    padding:6px 8px;
+    cursor:pointer;
+    transition:transform .08s;
+    text-align:left;
+
+    border-width:2px;
+    border-style:solid;
+    overflow:hidden;
   }
-  .tile-grid .tile .icn{width:36px;height:36px;font-size:18px}
+
+  /* 使用者選色：外框是原色，內部是淡色 */
+  .tile-grid .tile[data-cat-color]{
+    background:var(--cat-tile-bg, rgba(255,255,255,.25)) !important;
+  }
+
+  /* icon 小一點，避免壓縮文字 */
+  .tile-grid .tile .icn{
+    width:26px;
+    height:26px;
+    font-size:16px;
+    display:grid;
+    place-items:center;
+    border-radius:8px;
+    background:rgba(255,255,255,.45);
+    border:1.5px solid rgba(0,0,0,.18);
+    flex-shrink:0;
+  }
+
+  /* 類別名稱：最多顯示一行，超過用 ... */
   .tile-grid .tile .t-name{
-    font-size:16px;line-height:1.1;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    min-width:0;
     max-width:100%;
+    font-size:15px;
+    line-height:1.15;
+    font-weight:700;
+
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
-  .tile-grid .tile:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
-  .tile-grid .tile.selected{
-    background:var(--accent-soft) !important;
-    box-shadow:4px 4px 0 var(--accent);
-    outline:2px solid var(--accent);
+  /* 停用標籤避免把類別名稱擠爆 */
+  .tile-grid .tile .disabled-badge{
+    display:none;
+  }
+
+  /* 滑過效果 */
+  .tile-grid .tile:hover{
+    transform:translate(-1px,-1px);
+    box-shadow:4px 4px 0 var(--ink);
   }
   /* 新增用 tile (+ add) */
   .tile-grid .tile-add{
-    border:2px dashed var(--ink-soft);background:transparent;
-    color:var(--ink-soft);box-shadow:none;
-    display:flex;align-items:center;justify-content:center;
-    font-family:'Caveat';font-size:22px;cursor:pointer;
-  }
-  .tile-grid .tile-add:hover{
-    border-color:var(--accent);color:var(--accent);
-    background:rgba(232,100,58,.06);
-    transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--accent);
+    border:2px dashed var(--ink-soft);
+    background:transparent;
+    color:var(--ink);
+    box-shadow:none;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    font-family:'Kalam', 'Noto Sans TC', sans-serif;
+    font-size:16px;
+    font-weight:700;
+    line-height:1;
+    white-space:nowrap;
+
+    cursor:pointer;
+    padding:0 10px;
   }
 
-  /* Table */
-  .cat-table-host{
-    flex:1;min-height:0;border:2px dashed var(--ink);border-radius:12px;
-    background:#fffaf2;padding:6px;overflow:auto;
+  /* 選取狀態：不要蓋掉使用者選色，只加外框與陰影 */
+  .cat-page .tile-grid .tile.selected {
+    background:var(--cat-tile-bg, var(--cat-theme-soft)) !important;
+    box-shadow:4px 4px 0 var(--cat-theme);
+    outline:2px solid var(--cat-theme);
   }
-  .cat-table-host table.wire{table-layout:fixed;width:100%}
-  .cat-table-host col.c-name { width: 30%; }
-  .cat-table-host col.c-icon { width: 15%; }
-  .cat-table-host col.c-color{ width: 25%; }
-  .cat-table-host col.c-sys  { width: 15%; }
-  .cat-table-host col.c-dis  { width: 15%; }
-  .cat-table-host th:nth-child(n+2), .cat-table-host td:nth-child(n+2){text-align:center}
-  .cat-table-host tbody tr{cursor:pointer}
-  .cat-table-host tbody tr:hover td{background:rgba(232,100,58,.08)}
-  .cat-table-host tbody tr.selected td{background:var(--accent-soft)}
-
-  /* th 內部文字: 桌機顯示 full, 手機顯示 short (替代舊的 data-short hack) */
-  .cat-table-host .th-short{display:none}
-  .cat-table-host .th-full{display:inline}
-
-  /* name 欄的 3 個子元素: 色條 + emoji + 文字 (inline 排列, 不用 flex 避免破壞 table) */
-  .cat-table-host .cat-bar{
-    display:inline-block;width:4px;height:18px;border-radius:2px;
-    vertical-align:middle;margin-right:6px;
-  }
-  .cat-table-host .cat-emoji{
-    display:inline-block;font-size:16px;line-height:1;
-    vertical-align:middle;margin-right:6px;
-  }
-  .cat-table-host .cat-label{
-    vertical-align:middle;
-  }
-
-  /* color swatch */
-  .sw-inline{
-    display:inline-block;width:18px;height:18px;border:1.5px solid var(--ink);
-    border-radius:4px;vertical-align:middle;
-  }
-
-  /* 紅色刪除按鈕 */
-  .btn.danger{
-    background:#fff;color:var(--rose);border-color:var(--rose);
-    box-shadow:2px 2px 0 var(--rose);
-  }
-  .btn.danger:hover{background:#ffe5e5}
 
   /* flag checkboxes */
   .flag-row{
@@ -222,6 +291,20 @@
     color:#fff;font-size:12px;font-weight:700;
     text-shadow:0 0 2px rgba(0,0,0,.6);
   }
+  .tile.is-disabled {
+    opacity: 0.55;
+    border-style: dashed;
+  }
+
+  .disabled-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    background: #eee;
+    color: #777;
+  }
 
   @media (max-width: 899px){
     /* 手機版: 保留左右版型, 讓內容緊湊塞進一頁 */
@@ -255,28 +338,43 @@
     .cat-tiles-section h3{font-size:11px;margin:0;line-height:1}
     .cat-tiles-section > .row{margin:0;line-height:1}
     .cat-tiles-section > .row small{font-size:9px}
-    .cat-table-section{flex:0 0 auto;min-height:0;padding:3px 6px;gap:2px}
-    .cat-table-section h3{font-size:11px;margin:0;line-height:1}
-    /* 手機下 Details 只顯示 1 筆, 高度自動 (不 flex:1 避免撐高) */
-    .cat-table-section .cat-table-host{flex:0 0 auto;padding:3px}
     /* tile-grid 2 列 9 欄 = 18 格 (含 +新增 17 筆分類) */
     .tile-grid{
-      grid-template-columns:repeat(9, 1fr);
-      grid-auto-rows:46px;gap:2px;
-      max-height:94px;overflow:hidden;
+      grid-template-columns:repeat(auto-fill, 106px);
+      grid-auto-rows:44px;
+      gap:4px;
+      max-height:96px;
+      overflow:hidden;
       padding:1px;
     }
-    .tile-grid .tile{padding:2px;gap:1px}
-    .tile-grid .tile .icn{width:22px;height:22px;font-size:14px}
-    .tile-grid .tile .t-name{font-size:12px;line-height:1;font-weight:700}
-    /* +新增 tile 字縮小避免在小 tile 內折行擠壓 */
-    .tile-grid .tile-add{font-size:11px;line-height:1.1;padding:1px;font-weight:700}
+
+    .tile-grid .tile{
+      grid-template-columns:22px 1fr;
+      padding:4px 5px;
+      gap:4px;
+    }
+
+    .tile-grid .tile .icn{
+      width:20px;
+      height:20px;
+      font-size:12px;
+    }
+
+    .tile-grid .tile .t-name{
+      font-size:12px;
+      line-height:1;
+      font-weight:700;
+    }
+
+    .tile-grid .tile-add{
+      font-size:12px;
+      line-height:1;
+      padding:0 5px;
+      white-space:nowrap;
+    }
     /* tiles 的 pager 也要壓小 */
     .cat-tiles-section .wp-pager{padding:1px 0}
     .cat-tiles-section .wp-pager button{padding:1px 5px;font-size:10px;min-width:18px}
-    /* table pager 也壓小 */
-    .cat-table-section .wp-pager{padding:1px 0}
-    .cat-table-section .wp-pager button{padding:1px 5px;font-size:10px;min-width:18px}
     label.field{margin-bottom:2px}
     label.field span{font-size:11px;margin-bottom:0}
     .input{font-size:12px;padding:3px 6px}
@@ -304,62 +402,38 @@
     .picker-wrap{gap:2px}
     .picker-wrap .pg-btn{font-size:13px;padding:0 4px}
     .picker-info{font-size:9px}
-
-    /* Details 表格: 手機保留全部 5 欄 (Details 現在只顯示 1 筆,空間夠) */
-    .cat-table-host col.c-name  { width: 30%; }
-    .cat-table-host col.c-icon  { width: 12%; }
-    .cat-table-host col.c-color { width: 24%; }
-    .cat-table-host col.c-sys   { width: 17%; }
-    .cat-table-host col.c-dis   { width: 17%; }
-    .cat-table-host{padding:3px;font-size:11px}
-    .cat-table-host table.wire{table-layout:fixed;width:100%}
-    .cat-table-host th{
-      padding:2px 3px !important;font-size:10px;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    }
-    .cat-table-host td{
-      padding:4px 3px !important;font-size:11px;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    }
-    /* 手機下 thead 切換短文字 */
-    .cat-table-host .th-full{display:none}
-    .cat-table-host .th-short{display:inline}
-    /* name 欄的色條和 emoji 手機縮小 */
-    .cat-table-host .cat-bar{width:3px;height:14px;margin-right:4px}
-    .cat-table-host .cat-emoji{font-size:13px;margin-right:4px}
   }
 </style>
 </head>
 <body>
 
 
-<main>
-  <h1 class="page-title" data-page="categories">Categories <span class="count" id="catCount">—</span></h1>
-  <p class="page-sub">管理支出／收入分類 · 資料表: categories · API: /api/categories</p>
+<main id="categoryPage" class="cat-page cat-theme-expense">
+  <h1 class="page-title" data-page="categories">類別管理 <span class="count" id="catCount">—</span></h1>
+  <p class="page-sub">管理我的支出／收入分類</p>
 
   <div class="toolbar">
     <div class="seg" style="max-width:260px">
-      <button class="seg-btn active" data-type="EXPENSE">EXPENSE</button>
-      <button class="seg-btn" data-type="INCOME">INCOME</button>
+      <button class="seg-btn active" data-type="EXPENSE">支出類別</button>
+      <button class="seg-btn" data-type="INCOME">收入類別</button>
     </div>
-    <input class="input" id="searchInput" placeholder="🔍 search category" style="max-width:220px"/>
+    <input class="input" id="searchInput" placeholder="🔍 搜尋類別" style="max-width:220px"/>
   </div>
 
   <div class="cat-grid">
     <!-- LEFT: form (new / edit) -->
-    <section class="cat-panel">
-      <h3 style="margin:0" id="catFormTitle">New category</h3>
+    <section class="cat-panel cat-form-panel cat-theme-expense" id="catFormPanel">
+      <h3 style="margin:0" id="catFormTitle">新增類別</h3>
       <form id="catForm" novalidate>
         <label class="field">
-          <span>categoryName</span>
-          <input class="input" id="catName" name="categoryName" placeholder="e.g. 飲食" required maxlength="45"/>
+          <span>類別名稱</span>
+          <input class="input" id="catName" name="categoryName" placeholder="例如：飲食" required maxlength="45"/>
         </label>
         <div class="field">
-          <span>icon <small>(點選圖示)</small></span>
+          <span>圖示 <small>(點選圖示)</small></span>
           <div class="icon-current">
             <span class="ic-display" id="iconDisplay">📦</span>
             <span>目前選用</span>
-            <span style="font-family:'Kalam';font-size:13px;color:var(--ink);" id="iconLabel">📦</span>
           </div>
           <!-- 隱藏的 input 給 form submit 用 -->
           <input type="hidden" id="catIcon" name="icon" value="📦"/>
@@ -371,7 +445,7 @@
           <div class="picker-info" id="iconPickerInfo">—</div>
         </div>
         <div class="field">
-          <span>color <small>(點選色塊)</small></span>
+          <span>底色 <small>(點選色塊)</small></span>
           <div class="color-current">
             <span class="cc-swatch" id="colorSwatch" style="background:#FF9F43"></span>
             <input type="text" class="cc-code" id="catColor" name="color" value="#FF9F43" maxlength="7" placeholder="#FF9F43"/>
@@ -383,62 +457,33 @@
           </div>
           <div class="picker-info" id="colorPickerInfo">—</div>
         </div>
-        <div class="field">
-          <span>flags</span>
+        <div class="field" id="catStatusField" style="display:none">
+          <span>使用狀態</span>
           <div class="flag-row">
-            <label><input type="checkbox" id="catDisabled" name="isDisable"/> isDisable</label>
+            <label>
+              <input type="checkbox" id="catDisabled" name="isDisable"/>
+              停用此分類
+            </label>
           </div>
-          <small style="font-family:'Kalam';font-size:11px;color:var(--muted);margin-top:2px">
-            isSystem 由後端判定 · categoryType 由上方 EXPENSE/INCOME 決定
-          </small>
         </div>
 
         <div class="form-spacer"></div>
         <div class="row" style="gap:8px;margin-top:4px">
-          <button type="button" class="btn danger" id="catDeleteBtn" style="display:none;justify-content:center;padding:6px 12px">🗑 Delete</button>
-          <button type="button" class="btn" id="catCancelBtn" style="flex:1;justify-content:center">Clear</button>
-          <button type="submit" class="btn primary" id="catSubmitBtn" style="flex:1;justify-content:center">Save category</button>
+          <button type="button" class="btn" id="catCancelBtn" style="flex:1;justify-content:center">清除</button>
+          <button type="submit" class="btn primary" id="catSubmitBtn" style="flex:1;justify-content:center">儲存支出類別</button>
         </div>
       </form>
     </section>
 
-    <!-- RIGHT: tile grid (top) + table (bottom) -->
+    <!-- RIGHT: tile grid -->
     <div class="cat-right">
       <section class="cat-section cat-tiles-section">
         <div class="row" style="justify-content:space-between;align-items:baseline">
-          <h3 style="margin:0">Tiles</h3>
-          <small style="font-family:'Kalam';font-size:11px;color:var(--muted)">點選 tile 可編輯</small>
+          <h3 style="margin:0">類別總覽</h3>
+          <small style="font-family:'Kalam';font-size:11px;color:var(--muted)">點選即可編輯</small>
         </div>
         <div class="tile-grid" id="tileGrid"></div>
         <div class="wp-pager" id="tilePager"></div>
-      </section>
-
-      <section class="cat-section cat-table-section">
-        <h3 style="margin:0">Details</h3>
-        <div class="cat-table-host">
-          <table class="wire">
-            <colgroup>
-              <col class="c-name"/>
-              <col class="c-icon"/>
-              <col class="c-color"/>
-              <col class="c-sys"/>
-              <col class="c-dis"/>
-            </colgroup>
-            <thead>
-              <tr>
-                <th><span class="th-full">categoryName</span><span class="th-short">name</span></th>
-                <th>icon</th>
-                <th>color</th>
-                <th><span class="th-full">isSystem</span><span class="th-short">sys</span></th>
-                <th><span class="th-full">isDisable</span><span class="th-short">dis</span></th>
-              </tr>
-            </thead>
-            <tbody id="catTableBody">
-              <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">讀取中…</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="wp-pager" id="tablePager"></div>
       </section>
     </div>
   </div>
@@ -455,33 +500,6 @@
      { categoryId, userId, categoryName, categoryType,
        icon, color, isSystem, isDisable, createdAt }
    ============================================================== */
-
-const demoCategories = [
-  { categoryId: 'ES001', categoryName: '飲食',    categoryType: 'EXPENSE', icon: '🍜', color: '#FF9F43', isSystem: true,  isDisable: false },
-  { categoryId: 'ES002', categoryName: '衣飾',    categoryType: 'EXPENSE', icon: '👕', color: '#A29BFE', isSystem: true,  isDisable: false },
-  { categoryId: 'ES003', categoryName: '住宅',    categoryType: 'EXPENSE', icon: '🏠', color: '#c98a55', isSystem: true,  isDisable: false },
-  { categoryId: 'ES004', categoryName: '交通',    categoryType: 'EXPENSE', icon: '🚇', color: '#4a7bb7', isSystem: true,  isDisable: false },
-  { categoryId: 'ES005', categoryName: '娛樂',    categoryType: 'EXPENSE', icon: '🎬', color: '#e8c55a', isSystem: true,  isDisable: false },
-  { categoryId: 'ES006', categoryName: '水電',    categoryType: 'EXPENSE', icon: '💡', color: '#e8a63a', isSystem: true,  isDisable: false },
-  { categoryId: 'ES007', categoryName: '其他',    categoryType: 'EXPENSE', icon: '📦', color: '#888888', isSystem: true,  isDisable: false },
-  { categoryId: 'ES008', categoryName: '醫療',    categoryType: 'EXPENSE', icon: '🏥', color: '#d76565', isSystem: true,  isDisable: false },
-  { categoryId: 'ES009', categoryName: '教育',    categoryType: 'EXPENSE', icon: '📚', color: '#5d7ce2', isSystem: true,  isDisable: false },
-  { categoryId: 'ES010', categoryName: '寵物',    categoryType: 'EXPENSE', icon: '🐱', color: '#ffb88c', isSystem: false, isDisable: false },
-  { categoryId: 'ES011', categoryName: '保險',    categoryType: 'EXPENSE', icon: '🛡', color: '#4a90a4', isSystem: true,  isDisable: false },
-  { categoryId: 'ES012', categoryName: '運動',    categoryType: 'EXPENSE', icon: '🏀', color: '#f5a623', isSystem: false, isDisable: false },
-  { categoryId: 'ES013', categoryName: '旅遊',    categoryType: 'EXPENSE', icon: '✈️', color: '#7ed321', isSystem: false, isDisable: false },
-  { categoryId: 'ES014', categoryName: '3C 設備', categoryType: 'EXPENSE', icon: '📱', color: '#9013fe', isSystem: false, isDisable: false },
-  { categoryId: 'ES015', categoryName: '禮物',    categoryType: 'EXPENSE', icon: '🎁', color: '#d0021b', isSystem: false, isDisable: false },
-  { categoryId: 'ES016', categoryName: '訂閱',    categoryType: 'EXPENSE', icon: '💳', color: '#9b9b9b', isSystem: false, isDisable: false },
-  { categoryId: 'IS001', categoryName: '薪水',    categoryType: 'INCOME',  icon: '💰', color: '#2ECC71', isSystem: true,  isDisable: false },
-  { categoryId: 'IS002', categoryName: '投資',    categoryType: 'INCOME',  icon: '📈', color: '#3498DB', isSystem: true,  isDisable: false },
-  { categoryId: 'IS003', categoryName: '獎金',    categoryType: 'INCOME',  icon: '🎁', color: '#6aa35d', isSystem: false, isDisable: false },
-  { categoryId: 'IS004', categoryName: '兼職',    categoryType: 'INCOME',  icon: '💼', color: '#f39c12', isSystem: false, isDisable: false },
-  { categoryId: 'IS005', categoryName: '退稅',    categoryType: 'INCOME',  icon: '🧾', color: '#16a085', isSystem: false, isDisable: false },
-  { categoryId: 'IS006', categoryName: '利息',    categoryType: 'INCOME',  icon: '🏦', color: '#27ae60', isSystem: true,  isDisable: false },
-  { categoryId: 'IS007', categoryName: '紅包',    categoryType: 'INCOME',  icon: '🧧', color: '#e74c3c', isSystem: false, isDisable: false },
-  { categoryId: 'IS008', categoryName: '其他收入', categoryType: 'INCOME', icon: '💵', color: '#95a5a6', isSystem: true,  isDisable: false },
-];
 
 /* 完整 icon palette - EXPENSE / INCOME 分兩套, 覆蓋常見類別 */
 const ICON_PALETTE = {
@@ -534,16 +552,49 @@ const state = {
   editingCategoryId: null,
 };
 
-const tilePager  = WalletPet.createPager({ pageSize: 20 });   // 桌機夠大,不分頁
-const tablePager = WalletPet.createPager({ pageSize: 6 });
+function getCatLabel(type = state.type) {
+  return type === 'INCOME' ? '收入類別' : '支出類別';
+}
+
+function getCatThemeClass(type = state.type) {
+  return type === 'INCOME' ? 'cat-theme-income' : 'cat-theme-expense';
+}
+
+function applyCategoryMode(mode = 'create') {
+  const label = getCatLabel();
+  const isEdit = mode === 'edit';
+
+  const page = document.getElementById('categoryPage');
+  if (page) {
+    page.classList.remove('cat-theme-expense', 'cat-theme-income');
+    page.classList.add(getCatThemeClass());
+  }
+
+  const panel = document.getElementById('catFormPanel');
+  if (panel) {
+    panel.classList.remove('cat-theme-expense', 'cat-theme-income');
+    panel.classList.add(getCatThemeClass());
+  }
+
+  document.getElementById('catFormTitle').textContent =
+    isEdit ? `編輯${label}` : `新增${label}`;
+
+  document.getElementById('catSubmitBtn').textContent =
+    isEdit ? '儲存修改' : `儲存${label}`;
+
+  document.getElementById('catCancelBtn').textContent =
+    isEdit ? '取消' : '清除';
+}
+
+const tilePager = WalletPet.createPager({ pageSize: 20 }); // 類別卡片分頁
+
 function adjustPagerSize() {
   const small = window.matchMedia('(max-width: 899px)').matches;
-  tilePager.pageSize  = small ? 17 : 20;    // 手機 2列9欄=18格(+新增=17筆)
-  tablePager.pageSize = small ? 2 : 6;
+  tilePager.pageSize = small ? 11 : 20; // 手機保留較少筆數，避免版面過擠
 }
 adjustPagerSize();
 window.addEventListener('resize', () => {
-  adjustPagerSize(); renderTiles(); renderTable();
+  adjustPagerSize(); renderTiles();
 });
 
 function visible() {
@@ -558,91 +609,51 @@ function renderTiles() {
   const all = visible();
   tilePager.setItems(all);
   const list = tilePager.visible();
+
   const tiles = list.map(c => {
     const sel = c.categoryId === state.editingCategoryId ? ' selected' : '';
-    return `<div class="tile${sel}" data-category-id="${c.categoryId}" style="border-color:${c.color || 'var(--ink)'}">
-      <div class="icn" style="background:${c.color ? c.color + '33' : 'var(--accent-soft)'}">${c.icon || '📦'}</div>
-      <div class="t-name">${c.categoryName}</div>
+    const disabledClass = c.isDisable ? ' is-disabled' : '';
+    const disabledBadge = c.isDisable ? '<span class="disabled-badge">停用</span>' : '';
+    const color = c.color || 'var(--ink)';
+    const softColor = c.color ? `${c.color}33` : 'var(--accent-soft)'; // 33 約等於 20% 不透明度，顏色較淡
+
+    return `<div class="tile${sel}${disabledClass}" 
+      data-category-id="${c.categoryId}"
+      data-cat-color="1"
+      title="${c.categoryName}"
+      style="border-color:${color}; --cat-tile-bg:${softColor};">
+
+      <div class="icn">
+        ${c.icon || '📦'}
+      </div>
+
+      <div class="t-name">
+        ${c.categoryName}
+        ${disabledBadge}
+      </div>
     </div>`;
   }).join('');
 
-  // +新增 tile: 永遠在第一頁最左邊顯示,這樣使用者一眼就看到新增入口
+  // +新增 tile: 永遠在第一頁最左邊顯示，這樣使用者一眼就看到新增入口
   const isFirstPage = tilePager.current === 1;
+  const label = getCatLabel();
+
   const addTile = isFirstPage
-    ? `<div class="tile tile-add" id="addCategoryTile" title="新增一筆 ${state.type} 分類">+ 新增</div>`
+    ? `<div class="tile tile-add" id="addCategoryTile" title="新增${label}">+ ${label}</div>`
     : '';
 
-  document.getElementById('tileGrid').innerHTML = (addTile + tiles) ||
-    `<div class="tile tile-add" id="addCategoryTile">+ 新增第一筆</div>`;
+  document.getElementById('tileGrid').innerHTML = addTile + tiles;
+
   tilePager.renderInto('tilePager', renderTiles, { alwaysShow: true });
 }
 
-function renderTable() {
-  const isMobile = window.matchMedia('(max-width: 899px)').matches;
+function render() {
+  renderTiles();
 
-  // 手機模式: 只顯示當前選中那筆, 不分頁
-  if (isMobile) {
-    document.getElementById('catCount').textContent =
-      state.categories.filter(c => c.categoryType === state.type).length + ' ' + state.type.toLowerCase();
-    // pager 區塊清空
-    document.getElementById('tablePager').innerHTML = '';
-
-    const editing = state.editingCategoryId
-      ? state.categories.find(c => c.categoryId === state.editingCategoryId)
-      : null;
-
-    if (!editing) {
-      // 初始 / 新增模式: 空白提示
-      document.getElementById('catTableBody').innerHTML =
-        `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px;font-size:11px">
-          請點選上方 tile 查看詳情
-        </td></tr>`;
-      return;
-    }
-
-    // 顯示該筆 (同桌機 row 格式)
-    const c = editing;
-    document.getElementById('catTableBody').innerHTML = `
-      <tr class="selected" data-category-id="${c.categoryId}">
-        <td>
-          <span class="cat-bar" style="background:${c.color || '#888'}"></span>
-          <span class="cat-emoji">${c.icon || '📦'}</span>
-          <span class="cat-label">${c.categoryName}</span>
-        </td>
-        <td>${c.icon || '—'}</td>
-        <td><span class="sw-inline" style="background:${c.color || '#888'}"></span> <small style="font-family:'Kalam';font-size:11px">${c.color || ''}</small></td>
-        <td>${c.isSystem}</td>
-        <td>${c.isDisable}</td>
-      </tr>`;
-    return;
-  }
-
-  // 桌機模式: 正常分頁列表
-  const all = visible();
-  tablePager.setItems(all);
-  const list = tablePager.visible();
-  const rows = list.map(c => {
-    const sel = c.categoryId === state.editingCategoryId ? ' class="selected"' : '';
-    return `<tr${sel} data-category-id="${c.categoryId}">
-      <td>
-        <span class="cat-bar" style="background:${c.color || '#888'}"></span>
-        <span class="cat-emoji">${c.icon || '📦'}</span>
-        <span class="cat-label">${c.categoryName}</span>
-      </td>
-      <td>${c.icon || '—'}</td>
-      <td><span class="sw-inline" style="background:${c.color || '#888'}"></span> <small style="font-family:'Kalam';font-size:11px">${c.color || ''}</small></td>
-      <td>${c.isSystem}</td>
-      <td>${c.isDisable}</td>
-    </tr>`;
-  }).join('');
-  document.getElementById('catTableBody').innerHTML = rows ||
-    '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">無符合條件的分類</td></tr>';
+  const count = state.categories.filter(c => c.categoryType === state.type).length;
   document.getElementById('catCount').textContent =
-    state.categories.filter(c => c.categoryType === state.type).length + ' ' + state.type.toLowerCase();
-  tablePager.renderInto('tablePager', renderTable);
+    `${count} 筆${getCatLabel()}`;
 }
-
-function render() { renderTiles(); renderTable(); }
 
 /* ---------- icon picker (分頁式) ---------- */
 const pickerState = {
@@ -679,7 +690,6 @@ function renderIconPicker() {
 function setIcon(ic) {
   document.getElementById('catIcon').value = ic;
   document.getElementById('iconDisplay').textContent = ic;
-  document.getElementById('iconLabel').textContent = ic;
   // 自動翻到該 icon 所在的頁
   const icons = ICON_PALETTE[state.type] || [];
   const idx = icons.indexOf(ic);
@@ -754,37 +764,60 @@ window.addEventListener('resize', () => {
 });
 
 /* ========================================================
-   Form: new / edit / delete
+   Form: new / edit 
    ======================================================== */
 function enterCatEditMode(c) {
   state.editingCategoryId = c.categoryId;
-  // 若 type 和目前 seg 不同,切換 seg
+
   if (c.categoryType !== state.type) {
     state.type = c.categoryType;
     document.querySelectorAll('.seg-btn').forEach(x =>
-      x.classList.toggle('active', x.dataset.type === state.type));
+      x.classList.toggle('active', x.dataset.type === state.type)
+    );
   }
-  document.getElementById('catFormTitle').textContent = 'Edit: ' + c.categoryName;
+
+  applyCategoryMode('edit');
+
   document.getElementById('catName').value = c.categoryName;
+
   setIcon(c.icon || '📦');
-  setColor(c.color || '#FF9F43');
+  setColor(c.color || getDefaultCategoryColor());
+
+  const statusField = document.getElementById('catStatusField');
+  if (statusField) {
+    statusField.style.display = '';
+  }
+
   document.getElementById('catDisabled').checked = !!c.isDisable;
-  document.getElementById('catSubmitBtn').textContent = 'Save changes';
-  document.getElementById('catCancelBtn').textContent = 'Cancel';
-  document.getElementById('catDeleteBtn').style.display = 'inline-flex';
+
   render();
 }
 
 function resetCatForm() {
   state.editingCategoryId = null;
+
   document.getElementById('catForm').reset();
+
   setIcon('📦');
-  setColor('#FF9F43');
-  document.getElementById('catFormTitle').textContent = 'New category';
-  document.getElementById('catSubmitBtn').textContent = 'Save category';
-  document.getElementById('catCancelBtn').textContent = 'Clear';
-  document.getElementById('catDeleteBtn').style.display = 'none';
+  setColor(getDefaultCategoryColor());
+
+  applyCategoryMode('create');
+
+  const statusField = document.getElementById('catStatusField');
+  if (statusField) {
+    statusField.style.display = 'none';
+  }
+
+  const disabledInput = document.getElementById('catDisabled');
+  if (disabledInput) {
+    disabledInput.checked = false;
+  }
+
   render();
+}
+
+function getDefaultCategoryColor(type = state.type) {
+  return type === 'INCOME' ? '#C0DAB5' : '#FDC0AE';
 }
 
 /* 點 tile */
@@ -797,103 +830,83 @@ document.getElementById('tileGrid').addEventListener('click', e => {
   }
   const tile = e.target.closest('[data-category-id]');
   if (!tile) return;
-  const c = state.categories.find(x => x.categoryId === tile.dataset.categoryId);
-  if (c) enterCatEditMode(c);
-});
-/* 點 table row → edit mode */
-document.getElementById('catTableBody').addEventListener('click', e => {
-  const tr = e.target.closest('tr[data-category-id]');
-  if (!tr) return;
-  const c = state.categories.find(x => x.categoryId === tr.dataset.categoryId);
+  const c = state.categories.find(x => String(x.categoryId) === String(tile.dataset.categoryId));
   if (c) enterCatEditMode(c);
 });
 
 /* Clear/Cancel */
 document.getElementById('catCancelBtn').addEventListener('click', resetCatForm);
 
-/* Delete */
-document.getElementById('catDeleteBtn').addEventListener('click', async () => {
-  if (!state.editingCategoryId) return;
-  const category = state.categories.find(
-    x => String(x.categoryId) === String(state.editingCategoryId)
-  );
-  const label = category?.categoryName || state.editingCategoryId;
-  if (!confirm(`確認停用分類「${label}」？停用後不會出現在新增交易選項中。`)) {
-    return;
-  }
-  try {
-    await WalletPet.categoryApi.disable(state.editingCategoryId);
-    // 重新向後端查詢，最穩
-    await loadCategories();
-    resetCategoryForm();
-  } catch (ex) {
-    alert(ex.message || '停用分類失敗');
-  }
-});
-
 async function loadCategories() {
   try {
     state.categories = await WalletPet.categoryApi.list({
-      type: state.type,
-      includeDisabled: true,
+      includeDisabled: true
     });
   } catch (e) {
     console.warn('[categories] 分類載入失敗', e);
     state.categories = [];
   }
-  renderCategories();
+
+  render();
 }
 
 /* Submit: create or update */
 document.getElementById('catForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+
   const body = {
     categoryName: document.getElementById('catName').value.trim(),
     categoryType: state.type,
-    icon:          document.getElementById('catIcon').value.trim() || null,
-    color:         document.getElementById('catColor').value.trim() || null,
-    isDisable:    document.getElementById('catDisabled').checked,
+    icon: document.getElementById('catIcon').value.trim() || null,
+    color: document.getElementById('catColor').value.trim() || null,
   };
+
   if (!body.categoryName) return;
 
   if (state.editingCategoryId) {
-    // UPDATE
+    // UPDATE：編輯時才允許更新 isDisable
+    body.isDisable = document.getElementById('catDisabled').checked;
+
     try {
-      const updated = await WalletPet.categoryApi.update(state.editingCategoryId, body);
-      const idx = state.categories.findIndex(x => x.categoryId === state.editingCategoryId);
-      if (idx >= 0) state.categories[idx] = updated || { ...state.categories[idx], ...body };
+      await WalletPet.categoryApi.update(state.editingCategoryId, body);
+      await loadCategories();
+      resetCatForm();
     } catch (ex) {
-      console.warn('[categories] 更新失敗, 本地模擬');
-      const idx = state.categories.findIndex(x => x.categoryId === state.editingCategoryId);
-      if (idx >= 0) state.categories[idx] = { ...state.categories[idx], ...body };
+      console.warn('[categories] 更新失敗', ex);
+      alert(ex.message || '更新分類失敗');
     }
-  } else {
-    // CREATE - 從陣列前端插入,讓新分類出現在 tile grid 最左邊(緊鄰 +新增 tile)
-    try {
-      const created = await WalletPet.categoryApi.create(body);
-      state.categories.unshift(created);
-    } catch (ex) {
-      console.warn('[categories] 新增失敗, 本地模擬');
-      const prefix = state.type === 'EXPENSE' ? 'ES' : 'IS';
-      state.categories.unshift({
-        categoryId: prefix + '_local_' + Date.now(),
-        isSystem: false,
-        ...body,
-      });
-    }
+
+    return;
   }
-  resetCatForm();
+
+  // CREATE：新增時不送 isDisable，後端預設為啟用
+  try {
+    await WalletPet.categoryApi.create(body);
+    await loadCategories();
+    resetCatForm();
+  } catch (ex) {
+    console.warn('[categories] 新增失敗', ex);
+    alert(ex.message || '新增分類失敗');
+  }
 });
 
 /* ---- type switch ---- */
 document.querySelectorAll('.seg-btn').forEach(b => {
   b.addEventListener('click', () => {
-    document.querySelectorAll('.seg-btn').forEach(x => x.classList.toggle('active', x === b));
     state.type = b.dataset.type;
+    state.editingCategoryId = null;
+
+    document.querySelectorAll('.seg-btn').forEach(x =>
+      x.classList.toggle('active', x.dataset.type === state.type)
+    );
+
     tilePager.goTo(1);
-    tablePager.goTo(1);
-    pickerState.iconPage = 0;   // 切換 EXPENSE/INCOME 回第一頁 icon
+    pickerState.iconPage = 0;
+    pickerState.colorPage = 0;
+
+    resetCatForm();
     renderIconPicker();
+    renderColorPalette();
     render();
   });
 });
@@ -902,17 +915,21 @@ document.querySelectorAll('.seg-btn').forEach(b => {
 document.getElementById('searchInput').addEventListener('input', e => {
   state.filter = e.target.value;
   tilePager.goTo(1);
-  tablePager.goTo(1);
   render();
 });
 
 /* ---- load ---- */
 async function init() {
-  try { state.categories = await WalletPet.categoryApi.list(); }
-  catch (e) {
-    console.warn('[categories] 使用 demo 資料 (' + e.message + ')');
-    state.categories = demoCategories;
+  try {
+    state.categories = await WalletPet.categoryApi.list({
+      includeDisabled: true
+    });
+  } catch (e) {
+    console.warn('尚未有登入資料故無使用者分類 (' + e.message + ')');
+    state.categories = [];
   }
+
+  applyCategoryMode('create');
   renderIconPicker();
   renderColorPalette();
   render();
