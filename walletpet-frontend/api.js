@@ -8,7 +8,7 @@
   const api = window.WalletPet && WalletPet.api;
   if (!api) { console.error('[wp-api] shared.js must load first'); return; }
 
-  /* ---------- Auth (第 2 組 彥祥) ---------- */
+   /* ---------- Auth (第 2 組 彥祥) ---------- */
   WalletPet.authApi = {
     login    : (body) => api.post('/api/auth/login', body),
     register : (body) => api.post('/api/users/register', body),
@@ -36,26 +36,51 @@
        TransferResponse: { accountTransId, userId, fromAccountId, toAccountId,
                            transactionAmount, transactionDate, note, createdAt } */
   WalletPet.transferApi = {
-    list   : (params) => api.get('/api/transfers' + qs(params)),
-    create : (body)   => api.post('/api/transfers', body),
+    list   : (params = {}) => api.get('/api/transfers' + api.qs(params)),
+    create : (body)       => api.post('/api/transfers', body),
   };
 
   /* ---------- Category (第 4 組 姿穎) ---------- */
   WalletPet.categoryApi = {
-    list   : (type = '') => api.get('/api/categories' + (type ? `?type=${type}` : '')),
-    create : (body)      => api.post('/api/categories', body),
-    update : (id, b)     => api.put(`/api/categories/${id}`, b),
-    remove : (id)        => api.del(`/api/categories/${id}`),
+    list: (params = {}) =>api.get('/api/categories' + api.qs(params)),
+    available: (type = '') =>api.get('/api/categories/available' + api.qs({ type })),
+    get: (id) =>api.get(`/api/categories/${id}`),
+    create: (body) =>api.postForm('/api/categories', {
+        categoryName: body.categoryName,
+        categoryType: body.categoryType,
+        icon: body.icon || '',
+        color: body.color || '',
+      }),
+    update: (id, body) =>api.putForm(`/api/categories/${id}`, {
+        categoryName: body.categoryName || '',
+        icon: body.icon || '',
+        color: body.color || '',
+        isDisable: body.isDisable,
+      }),
+    disable: (id) =>api.putForm(`/api/categories/${id}`, {isDisable: true,}),
   };
 
   /* ---------- Transaction (第 4 組) ---------- */
   WalletPet.transactionApi = {
-    list   : (query = '') => api.get('/api/transactions' + (query ? '?' + query : '')),
-    get    : (id)         => api.get(`/api/transactions/${id}`),
-    create : (body)       => api.post('/api/transactions', body),
-    update : (id, b)      => api.put(`/api/transactions/${id}`, b),
-    remove : (id)         => api.del(`/api/transactions/${id}`),
-  };
+  formMeta: (transactionType = '') =>
+    api.get('/api/transactions/form-meta' + api.qs({ transactionType })),
+
+  list: (params = {}) =>
+    api.get('/api/transactions' + api.qs({
+      startDate: params.startDate,
+      endDate: params.endDate,
+      accountId: params.accountId,
+      categoryId: params.categoryId,
+      type: params.type,
+      page: params.page,
+      size: params.size,
+    })),
+  summary: (params = {}) => api.get('/api/transactions/summary' + api.qs(params)),
+  get: (id) => api.get(`/api/transactions/${id}`),
+  create: (body) => api.post('/api/transactions', body),
+  update: (id, body) => api.put(`/api/transactions/${id}`, body),
+  remove: (id) => api.del(`/api/transactions/${id}`),
+};
 
   /* ---------- Budget (第 5 組 俊廷) ---------- */
   WalletPet.budgetApi = {
@@ -69,7 +94,7 @@
   WalletPet.savingGoalApi = {
     list   : ()      => api.get('/api/saving-goals'),
     create : (body)  => api.post('/api/saving-goals', body),
-    update : (id, b) => api.put(`/api/saving-goals/${id}`, b),
+    update: (id, b) => api.put(`/api/saving-goals/${id}`, b),
     remove : (id, toAccountId) => api.del(`/api/saving-goals/${id}?toAccountId=${toAccountId}`),
     deposit: (id, amount, fromAccountId) => 
   api.post(`/api/saving-goals/${id}/deposit?amount=${amount}&fromAccountId=${fromAccountId}`),
@@ -90,13 +115,17 @@
               -> { pet, streakDays, missedDays, moodDelta, appliedRule, firstLoginToday }
               (登入後呼叫一次,套用連續登入 +5/+10 / 缺席 -10/-20 / mood<60 連 7 拉回 60) */
   WalletPet.petApi = {
-    me                  : ()     => api.get('/api/pets/me'),
-    interact            : (body) => api.post('/api/pets/interact', body),
-    rewardByBookkeeping : (body) => api.post('/api/pets/reward-by-bookkeeping', body),
-    feed                : (body) => api.post('/api/pets/feed', body),
-    claimBookkeeping    : (body) => api.post('/api/pets/claim-bookkeeping', body),
-    loginTick           : (userId, petId) =>
-      api.post(`/api/pets/login-tick?userId=${encodeURIComponent(userId)}&petId=${encodeURIComponent(petId)}`),
+    me: () =>api.get('/api/pets/me'),
+    feed: (foodType) =>api.post('/api/pets/feed' + api.qs({ foodType })),
+    loginTick: (loginDate = '') =>api.post('/api/pets/login-tick' + api.qs({ loginDate })),
+  };
+  WalletPet.dailyRewardApi = {
+    today: (date = '') =>api.get('/api/rewards/daily/today' + api.qs({ date })),
+    calculate: (date = '') =>api.post('/api/rewards/daily/calculate' + api.qs({ date })),
+    history: () =>api.get('/api/rewards/daily/history'),
+  };
+  WalletPet.petEventApi = {
+    list: (params = {}) =>api.get('/api/pets/events' + api.qs(params)),
   };
 
   /* ---------- Chart / 圖表 (第 2, 6 組) — 規格 4.5 Chart 模組 ----------

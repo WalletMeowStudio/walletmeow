@@ -17,11 +17,6 @@ public class CategoryMapper {
         CategoryResponse response = new CategoryResponse();
 
         response.setCategoryId(category.getCategoryId());
-
-        if (category.getUser() != null) {
-            response.setUserId(category.getUser().getUserId());
-        }
-
         response.setCategoryName(category.getCategoryName());
         response.setCategoryType(category.getCategoryType());
         response.setIcon(category.getIcon());

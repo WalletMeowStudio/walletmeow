@@ -2,7 +2,10 @@ package com.walletpet.service.impl;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -13,10 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.walletpet.dto.transaction.TransactionCreateRequest;
-import com.walletpet.dto.transaction.TransactionFormMetaResponse;
-import com.walletpet.dto.transaction.TransactionListResponse;
 import com.walletpet.dto.transaction.TransactionResponse;
-import com.walletpet.dto.transaction.TransactionSummaryResponse;
 import com.walletpet.dto.transaction.TransactionUpdateRequest;
 import com.walletpet.entity.Account;
 import com.walletpet.entity.Category;
@@ -52,18 +52,29 @@ public class TransactionServiceImpl implements TransactionService {
 
     private final DailyRewardService dailyRewardService;
 
-    /**
+    /*
      * 取得新增 / 編輯交易表單需要的帳戶與分類資料。
+     *
+     * DTO 最小化後，不再回傳 TransactionFormMetaResponse。
+     * 改用 Map：
+     *
+     * {
+     *   "accounts": [...],
+     *   "categories": [...]
+     * }
      */
     @Override
     @Transactional(readOnly = true)
-    public TransactionFormMetaResponse getFormMeta(
+    public Map<String, Object> getFormMeta(
             String currentUserId,
             TransactionType transactionType
     ) {
-        List<Account> accounts = accountRepository.findByUser_UserIdAndIsDeletedFalse(currentUserId)
+        validateCurrentUserId(currentUserId);
+
+        List<Account> accounts = accountRepository
+                .findByUser_UserIdAndIsDeletedFalse(currentUserId)
                 .stream()
-                // 一般收入 / 支出不顯示存款目標專用帳戶
+                // 一般收入 / 支出不顯示存錢目標專用帳戶
                 .filter(account -> !Boolean.TRUE.equals(account.getIsSavingAccount()))
                 .collect(Collectors.toList());
 
@@ -84,57 +95,35 @@ public class TransactionServiceImpl implements TransactionService {
             );
         }
 
-        TransactionFormMetaResponse response = new TransactionFormMetaResponse();
+        List<Map<String, Object>> accountOptions = accounts.stream()
+                .map(this::toAccountOptionMap)
+                .collect(Collectors.toList());
 
-        response.setAccounts(
-                accounts.stream()
-                        .map(account -> {
-                            TransactionFormMetaResponse.AccountOption option =
-                                    new TransactionFormMetaResponse.AccountOption();
+        List<Map<String, Object>> categoryOptions = categories.stream()
+                .map(this::toCategoryOptionMap)
+                .collect(Collectors.toList());
 
-                            option.setAccountId(account.getAccountId());
-                            option.setAccountName(account.getAccountName());
-                            option.setBalance(account.getBalance());
-                            option.setIsSavingAccount(account.getIsSavingAccount());
-
-                            return option;
-                        })
-                        .collect(Collectors.toList())
-        );
-
-        response.setCategories(
-                categories.stream()
-                        .map(category -> {
-                            TransactionFormMetaResponse.CategoryOption option =
-                                    new TransactionFormMetaResponse.CategoryOption();
-
-                            option.setCategoryId(category.getCategoryId());
-                            option.setCategoryName(category.getCategoryName());
-                            option.setCategoryType(category.getCategoryType());
-                            option.setIcon(category.getIcon());
-                            option.setColor(category.getColor());
-
-                            return option;
-                        })
-                        .collect(Collectors.toList())
-        );
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("accounts", accountOptions);
+        response.put("categories", categoryOptions);
 
         return response;
     }
 
-    /**
+    /*
      * 新增交易。
      *
-     * 收入：帳戶餘額增加
-     * 支出：帳戶餘額減少
+     * 收入：帳戶餘額增加。
+     * 支出：帳戶餘額減少。
      *
-     * 新增完成後會重新計算該日期的每日記帳獎勵。
+     * 新增完成後，重新計算該日期的每日記帳獎勵。
      */
     @Override
     public TransactionResponse createTransaction(
             String currentUserId,
             TransactionCreateRequest request
     ) {
+        validateCurrentUserId(currentUserId);
         validateCreateRequest(request);
 
         User user = userRepository.findById(currentUserId)
@@ -146,6 +135,8 @@ public class TransactionServiceImpl implements TransactionService {
                         currentUserId
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("帳戶不存在"));
+
+        validateAccountCanUseForTransaction(account);
 
         Category category = categoryRepository
                 .findByCategoryIdAndUser_UserId(
@@ -173,11 +164,16 @@ public class TransactionServiceImpl implements TransactionService {
         transaction.setTransactionType(request.getTransactionType());
         transaction.setTransactionAmount(request.getTransactionAmount());
         transaction.setTransactionDate(request.getTransactionDate());
-        transaction.setNote(request.getNote());
+        transaction.setNote(normalizeNullableText(request.getNote()));
 
         Transaction savedTransaction = transactionRepository.save(transaction);
 
-        // 新增交易後，重新計算該日期的每日記帳獎勵
+        /*
+         * Account 是 managed entity，通常會自動 flush。
+         * 這裡明確 save，方便測試時確認餘額有更新。
+         */
+        accountRepository.save(account);
+
         dailyRewardService.handleDailyReward(
                 currentUserId,
                 savedTransaction.getTransactionDate()
@@ -186,12 +182,26 @@ public class TransactionServiceImpl implements TransactionService {
         return TransactionMapper.toResponse(savedTransaction);
     }
 
-    /**
-     * 依條件查詢交易。
+    /*
+     * 查詢交易明細。
+     *
+     * DTO 最小化後，不再回傳 TransactionListResponse。
+     * 改用 Map：
+     *
+     * {
+     *   "summary": {...},
+     *   "items": [...],
+     *   "page": 0,
+     *   "size": 10,
+     *   "totalElements": 30,
+     *   "totalPages": 3,
+     *   "first": true,
+     *   "last": false
+     * }
      */
     @Override
     @Transactional(readOnly = true)
-    public TransactionListResponse searchTransactions(
+    public Map<String, Object> searchTransactions(
             String currentUserId,
             LocalDate startDate,
             LocalDate endDate,
@@ -201,13 +211,16 @@ public class TransactionServiceImpl implements TransactionService {
             int page,
             int size
     ) {
-        if (page < 0) {
-            throw new BusinessException("頁碼不可小於 0");
-        }
+        validateCurrentUserId(currentUserId);
+        validateDateRange(startDate, endDate);
+        validatePageParameter(page, size);
 
-        if (size <= 0) {
-            throw new BusinessException("每頁筆數必須大於 0");
-        }
+        /*
+         * hidden input 只可用來帶 id，不可作為資料歸屬依據。
+         * 所以有 accountId / categoryId 時，仍需驗證是否屬於 currentUserId。
+         */
+        validateOptionalAccountBelongsToCurrentUser(currentUserId, accountId);
+        validateOptionalCategoryBelongsToCurrentUser(currentUserId, categoryId);
 
         Pageable pageable = PageRequest.of(
                 page,
@@ -233,6 +246,9 @@ public class TransactionServiceImpl implements TransactionService {
                 .map(TransactionMapper::toResponse)
                 .collect(Collectors.toList());
 
+        /*
+         * summary 要統計符合篩選條件的全部資料，不只統計當頁資料。
+         */
         List<Transaction> summaryTransactions = transactionRepository.searchTransactionsForSummary(
                 currentUserId,
                 startDate,
@@ -242,22 +258,22 @@ public class TransactionServiceImpl implements TransactionService {
                 type
         );
 
-        TransactionSummaryResponse summary = calculateSummary(summaryTransactions);
+        Map<String, Object> summary = calculateSummary(summaryTransactions);
 
-        TransactionListResponse response = new TransactionListResponse();
-        response.setSummary(summary);
-        response.setItems(items);
-        response.setPage(transactionPage.getNumber());
-        response.setSize(transactionPage.getSize());
-        response.setTotalElements(transactionPage.getTotalElements());
-        response.setTotalPages(transactionPage.getTotalPages());
-        response.setFirst(transactionPage.isFirst());
-        response.setLast(transactionPage.isLast());
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("summary", summary);
+        response.put("items", items);
+        response.put("page", transactionPage.getNumber());
+        response.put("size", transactionPage.getSize());
+        response.put("totalElements", transactionPage.getTotalElements());
+        response.put("totalPages", transactionPage.getTotalPages());
+        response.put("first", transactionPage.isFirst());
+        response.put("last", transactionPage.isLast());
 
         return response;
     }
 
-    /**
+    /*
      * 查詢單筆交易。
      */
     @Override
@@ -266,6 +282,12 @@ public class TransactionServiceImpl implements TransactionService {
             String currentUserId,
             String transactionId
     ) {
+        validateCurrentUserId(currentUserId);
+
+        if (!hasText(transactionId)) {
+            throw new BusinessException("交易 ID 不可為空");
+        }
+
         Transaction transaction = transactionRepository
                 .findByTransactionIdAndUser_UserId(
                         transactionId,
@@ -276,15 +298,16 @@ public class TransactionServiceImpl implements TransactionService {
         return TransactionMapper.toResponse(transaction);
     }
 
-    /**
+    /*
      * 修改交易。
      *
      * 修改邏輯：
-     * 1. 先記住舊交易日期
-     * 2. 還原舊交易對帳戶餘額的影響
-     * 3. 套用新交易對帳戶餘額的影響
-     * 4. 儲存交易
-     * 5. 重新計算舊日期與新日期的每日獎勵
+     * 1. 記住舊交易日期
+     * 2. 還原舊交易對舊帳戶餘額造成的影響
+     * 3. 查詢新帳戶與新分類
+     * 4. 套用新交易對新帳戶餘額造成的影響
+     * 5. 儲存交易
+     * 6. 重新計算每日任務
      */
     @Override
     public TransactionResponse updateTransaction(
@@ -292,6 +315,12 @@ public class TransactionServiceImpl implements TransactionService {
             String transactionId,
             TransactionUpdateRequest request
     ) {
+        validateCurrentUserId(currentUserId);
+
+        if (!hasText(transactionId)) {
+            throw new BusinessException("交易 ID 不可為空");
+        }
+
         validateUpdateRequest(request);
 
         Transaction transaction = transactionRepository
@@ -302,15 +331,14 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElseThrow(() -> new ResourceNotFoundException("交易不存在"));
 
         LocalDate oldTransactionDate = transaction.getTransactionDate();
+        Account oldAccount = transaction.getAccount();
 
-        // 1. 先還原舊交易對舊帳戶造成的影響
         restoreAmountToAccount(
-                transaction.getAccount(),
+                oldAccount,
                 transaction.getTransactionType(),
                 transaction.getTransactionAmount()
         );
 
-        // 2. 查詢新的帳戶
         Account newAccount = accountRepository
                 .findByAccountIdAndUser_UserIdAndIsDeletedFalse(
                         request.getAccountId(),
@@ -318,7 +346,8 @@ public class TransactionServiceImpl implements TransactionService {
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("帳戶不存在"));
 
-        // 3. 查詢新的分類
+        validateAccountCanUseForTransaction(newAccount);
+
         Category newCategory = categoryRepository
                 .findByCategoryIdAndUser_UserId(
                         request.getCategoryId(),
@@ -331,30 +360,38 @@ public class TransactionServiceImpl implements TransactionService {
                 newCategory
         );
 
-        // 4. 套用新交易對新帳戶造成的影響
         applyAmountToAccount(
                 newAccount,
                 request.getTransactionType(),
                 request.getTransactionAmount()
         );
 
-        // 5. 更新交易資料
         transaction.setAccount(newAccount);
         transaction.setCategory(newCategory);
         transaction.setTransactionType(request.getTransactionType());
         transaction.setTransactionAmount(request.getTransactionAmount());
         transaction.setTransactionDate(request.getTransactionDate());
-        transaction.setNote(request.getNote());
+        transaction.setNote(normalizeNullableText(request.getNote()));
 
         Transaction savedTransaction = transactionRepository.save(transaction);
 
-        // 6. 修改交易後，重新計算舊日期的每日記帳獎勵
+        accountRepository.save(oldAccount);
+
+        if (!oldAccount.getAccountId().equals(newAccount.getAccountId())) {
+            accountRepository.save(newAccount);
+        }
+
+        /*
+         * 修改交易後要重算每日記帳獎勵。
+         *
+         * 如果日期沒變，只重算同一天。
+         * 如果日期有變，舊日期和新日期都要重算。
+         */
         dailyRewardService.handleDailyReward(
                 currentUserId,
                 oldTransactionDate
         );
 
-        // 7. 如果交易日期有改變，也重新計算新日期的每日記帳獎勵
         if (!oldTransactionDate.equals(savedTransaction.getTransactionDate())) {
             dailyRewardService.handleDailyReward(
                     currentUserId,
@@ -365,17 +402,23 @@ public class TransactionServiceImpl implements TransactionService {
         return TransactionMapper.toResponse(savedTransaction);
     }
 
-    /**
+    /*
      * 刪除交易。
      *
-     * 刪除前會先還原帳戶餘額。
-     * 刪除後會重新計算該日期的每日記帳獎勵。
+     * 刪除前先還原帳戶餘額。
+     * 刪除後重新計算該日期的每日任務。
      */
     @Override
     public TransactionResponse deleteTransaction(
             String currentUserId,
             String transactionId
     ) {
+        validateCurrentUserId(currentUserId);
+
+        if (!hasText(transactionId)) {
+            throw new BusinessException("交易 ID 不可為空");
+        }
+
         Transaction transaction = transactionRepository
                 .findByTransactionIdAndUser_UserId(
                         transactionId,
@@ -384,20 +427,19 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElseThrow(() -> new ResourceNotFoundException("交易不存在"));
 
         LocalDate deletedTransactionDate = transaction.getTransactionDate();
+        Account account = transaction.getAccount();
 
-        // 1. 刪除交易前，先還原帳戶餘額
         restoreAmountToAccount(
-                transaction.getAccount(),
+                account,
                 transaction.getTransactionType(),
                 transaction.getTransactionAmount()
         );
 
         TransactionResponse response = TransactionMapper.toResponse(transaction);
 
-        // 2. 刪除交易
         transactionRepository.delete(transaction);
+        accountRepository.save(account);
 
-        // 3. 刪除交易後，重新計算該日期的每日記帳獎勵
         dailyRewardService.handleDailyReward(
                 currentUserId,
                 deletedTransactionDate
@@ -406,18 +448,33 @@ public class TransactionServiceImpl implements TransactionService {
         return response;
     }
 
-    /**
+    /*
      * 查詢交易摘要。
+     *
+     * DTO 最小化後，不再回傳 TransactionSummaryResponse。
+     * 改用 Map：
+     *
+     * {
+     *   "totalIncome": 10000,
+     *   "totalExpense": 3000,
+     *   "balance": 7000,
+     *   "transactionCount": 5
+     * }
      */
     @Override
     @Transactional(readOnly = true)
-    public TransactionSummaryResponse getSummary(
+    public Map<String, Object> getSummary(
             String currentUserId,
             LocalDate startDate,
             LocalDate endDate,
             Integer accountId,
             String categoryId
     ) {
+        validateCurrentUserId(currentUserId);
+        validateDateRange(startDate, endDate);
+        validateOptionalAccountBelongsToCurrentUser(currentUserId, accountId);
+        validateOptionalCategoryBelongsToCurrentUser(currentUserId, categoryId);
+
         List<Transaction> transactions = transactionRepository.searchTransactionsForSummary(
                 currentUserId,
                 startDate,
@@ -430,12 +487,14 @@ public class TransactionServiceImpl implements TransactionService {
         return calculateSummary(transactions);
     }
 
-    /**
+    /*
+     * 每日任務用：
      * 計算某使用者某一天的收入 / 支出交易筆數。
      *
-     * 此方法給 DailyRewardService 使用。
-     * 若你目前 DailyRewardServiceImpl 是直接使用 TransactionRepository，
-     * 這個方法可保留但不是必須。
+     * 注意：
+     * DailyRewardServiceImpl 目前已直接使用 TransactionRepository，
+     * 所以這個方法可保留給其他模組使用，但 DailyReward 不再透過它呼叫，
+     * 以避免循環依賴。
      */
     @Override
     @Transactional(readOnly = true)
@@ -443,9 +502,7 @@ public class TransactionServiceImpl implements TransactionService {
             String currentUserId,
             LocalDate transactionDate
     ) {
-        if (currentUserId == null || currentUserId.isBlank()) {
-            throw new BusinessException("使用者不可為空");
-        }
+        validateCurrentUserId(currentUserId);
 
         if (transactionDate == null) {
             throw new BusinessException("交易日期不可為空");
@@ -454,77 +511,141 @@ public class TransactionServiceImpl implements TransactionService {
         return transactionRepository.countByUser_UserIdAndTransactionDateAndTransactionTypeIn(
                 currentUserId,
                 transactionDate,
-                java.util.Arrays.asList(TransactionType.INCOME, TransactionType.EXPENSE)
+                Arrays.asList(TransactionType.INCOME, TransactionType.EXPENSE)
         );
     }
 
-    /**
-     * 驗證新增交易資料。
-     */
     private void validateCreateRequest(TransactionCreateRequest request) {
         if (request == null) {
             throw new BusinessException("交易資料不可為空");
         }
 
-        if (request.getTransactionType() == null) {
-            throw new BusinessException("交易類型不可為空");
-        }
-
-        if (request.getAccountId() == null) {
-            throw new BusinessException("帳戶不可為空");
-        }
-
-        if (request.getCategoryId() == null || request.getCategoryId().isBlank()) {
-            throw new BusinessException("分類不可為空");
-        }
-
-        if (request.getTransactionAmount() == null
-                || request.getTransactionAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("交易金額必須大於 0");
-        }
-
-        if (request.getTransactionDate() == null) {
-            throw new BusinessException("交易日期不可為空");
-        }
+        validateTransactionFields(
+                request.getTransactionType(),
+                request.getAccountId(),
+                request.getCategoryId(),
+                request.getTransactionAmount(),
+                request.getTransactionDate()
+        );
     }
 
-    /**
-     * 驗證修改交易資料。
-     */
     private void validateUpdateRequest(TransactionUpdateRequest request) {
         if (request == null) {
             throw new BusinessException("交易資料不可為空");
         }
 
-        if (request.getTransactionType() == null) {
+        validateTransactionFields(
+                request.getTransactionType(),
+                request.getAccountId(),
+                request.getCategoryId(),
+                request.getTransactionAmount(),
+                request.getTransactionDate()
+        );
+    }
+
+    private void validateTransactionFields(
+            TransactionType transactionType,
+            Integer accountId,
+            String categoryId,
+            BigDecimal transactionAmount,
+            LocalDate transactionDate
+    ) {
+        if (transactionType == null) {
             throw new BusinessException("交易類型不可為空");
         }
 
-        if (request.getAccountId() == null) {
+        if (accountId == null) {
             throw new BusinessException("帳戶不可為空");
         }
 
-        if (request.getCategoryId() == null || request.getCategoryId().isBlank()) {
+        if (!hasText(categoryId)) {
             throw new BusinessException("分類不可為空");
         }
 
-        if (request.getTransactionAmount() == null
-                || request.getTransactionAmount().compareTo(BigDecimal.ZERO) <= 0) {
+        if (transactionAmount == null
+                || transactionAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("交易金額必須大於 0");
         }
 
-        if (request.getTransactionDate() == null) {
+        if (transactionDate == null) {
             throw new BusinessException("交易日期不可為空");
         }
     }
 
-    /**
-     * 檢查交易類型與分類類型是否一致。
-     *
-     * 例如：
-     * EXPENSE 交易只能使用 EXPENSE 分類。
-     * INCOME 交易只能使用 INCOME 分類。
-     */
+    private void validateCurrentUserId(String currentUserId) {
+        if (!hasText(currentUserId)) {
+            throw new BusinessException("使用者不可為空");
+        }
+    }
+
+    private void validateDateRange(
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new BusinessException("開始日期不可晚於結束日期");
+        }
+    }
+
+    private void validatePageParameter(
+            int page,
+            int size
+    ) {
+        if (page < 0) {
+            throw new BusinessException("頁碼不可小於 0");
+        }
+
+        if (size <= 0) {
+            throw new BusinessException("每頁筆數必須大於 0");
+        }
+
+        if (size > 100) {
+            throw new BusinessException("每頁筆數不可超過 100");
+        }
+    }
+
+    private void validateOptionalAccountBelongsToCurrentUser(
+            String currentUserId,
+            Integer accountId
+    ) {
+        if (accountId == null) {
+            return;
+        }
+
+        accountRepository.findByAccountIdAndUser_UserId(
+                accountId,
+                currentUserId
+        ).orElseThrow(() -> new ResourceNotFoundException("帳戶不存在"));
+    }
+
+    private void validateOptionalCategoryBelongsToCurrentUser(
+            String currentUserId,
+            String categoryId
+    ) {
+        if (!hasText(categoryId)) {
+            return;
+        }
+
+        categoryRepository.findByCategoryIdAndUser_UserId(
+                categoryId,
+                currentUserId
+        ).orElseThrow(() -> new ResourceNotFoundException("分類不存在"));
+    }
+
+    private void validateAccountCanUseForTransaction(Account account) {
+        if (account == null) {
+            throw new BusinessException("帳戶資料異常");
+        }
+
+        if (Boolean.TRUE.equals(account.getIsDeleted())) {
+            throw new BusinessException("此帳戶已停用，不能新增或修改交易");
+        }
+
+        if (Boolean.TRUE.equals(account.getIsSavingAccount())) {
+            throw new BusinessException("存錢目標專用帳戶不可直接新增收入或支出交易");
+        }
+    }
+
     private void validateCategoryMatchTransactionType(
             TransactionType transactionType,
             Category category
@@ -542,12 +663,6 @@ public class TransactionServiceImpl implements TransactionService {
         }
     }
 
-    /**
-     * 套用交易金額到帳戶。
-     *
-     * INCOME：balance + amount
-     * EXPENSE：balance - amount
-     */
     private void applyAmountToAccount(
             Account account,
             TransactionType transactionType,
@@ -561,15 +676,11 @@ public class TransactionServiceImpl implements TransactionService {
             account.setBalance(account.getBalance().add(amount));
         } else if (TransactionType.EXPENSE.equals(transactionType)) {
             account.setBalance(account.getBalance().subtract(amount));
+        } else {
+            throw new BusinessException("不支援的交易類型");
         }
     }
 
-    /**
-     * 還原交易金額對帳戶造成的影響。
-     *
-     * 原本是收入：刪除 / 修改時要扣回
-     * 原本是支出：刪除 / 修改時要加回
-     */
     private void restoreAmountToAccount(
             Account account,
             TransactionType transactionType,
@@ -583,13 +694,12 @@ public class TransactionServiceImpl implements TransactionService {
             account.setBalance(account.getBalance().subtract(amount));
         } else if (TransactionType.EXPENSE.equals(transactionType)) {
             account.setBalance(account.getBalance().add(amount));
+        } else {
+            throw new BusinessException("不支援的交易類型");
         }
     }
 
-    /**
-     * 計算查詢結果摘要。
-     */
-    private TransactionSummaryResponse calculateSummary(List<Transaction> transactions) {
+    private Map<String, Object> calculateSummary(List<Transaction> transactions) {
         BigDecimal totalIncome = BigDecimal.ZERO;
         BigDecimal totalExpense = BigDecimal.ZERO;
 
@@ -601,12 +711,51 @@ public class TransactionServiceImpl implements TransactionService {
             }
         }
 
-        TransactionSummaryResponse response = new TransactionSummaryResponse();
-        response.setTotalIncome(totalIncome);
-        response.setTotalExpense(totalExpense);
-        response.setBalance(totalIncome.subtract(totalExpense));
-        response.setTransactionCount(transactions.size());
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalIncome", totalIncome);
+        summary.put("totalExpense", totalExpense);
+        summary.put("balance", totalIncome.subtract(totalExpense));
+        summary.put("transactionCount", transactions.size());
 
-        return response;
+        return summary;
+    }
+
+    private Map<String, Object> toAccountOptionMap(Account account) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("accountId", account.getAccountId());
+        map.put("accountName", account.getAccountName());
+        map.put("balance", account.getBalance());
+        map.put("isSavingAccount", account.getIsSavingAccount());
+
+        return map;
+    }
+
+    private Map<String, Object> toCategoryOptionMap(Category category) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("categoryId", category.getCategoryId());
+        map.put("categoryName", category.getCategoryName());
+        map.put("categoryType", category.getCategoryType());
+        map.put("icon", category.getIcon());
+        map.put("color", category.getColor());
+
+        return map;
+    }
+
+    private String normalizeNullableText(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmedValue = value.trim();
+
+        if (trimmedValue.isEmpty()) {
+            return null;
+        }
+
+        return trimmedValue;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

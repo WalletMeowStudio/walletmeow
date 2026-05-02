@@ -3,79 +3,652 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>WalletPet — Transactions</title>
+<title>WalletPet — 我的記帳</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./shared.css">
 <style>
-  .tx-grid{
-    display:grid;grid-template-columns: minmax(280px, 360px) 1fr;gap:12px;
-    flex:1;min-height:0;
+  .tx-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 360px) 1fr;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
   }
-  .tx-panel{
-    border:2px solid var(--ink);border-radius:14px;background:rgba(255,255,255,.22);
-    box-shadow:3px 3px 0 var(--ink);
-    display:flex;flex-direction:column;padding:12px;gap:10px;min-width:0;min-height:0;
+  .tx-panel {
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    background: rgba(255,255,255,.22);
+    box-shadow: 3px 3px 0 var(--ink);
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 10px;
+    min-width: 0;
+    min-height: 0;
   }
-  .tx-panel > form{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow:auto}
-  .tx-list-host{
-    flex:1;min-height:0;border:2px dashed var(--ink);border-radius:12px;
-    background:#fffaf2;padding:6px;overflow:auto;
+  .tx-panel > form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
-  /* table 欄位寬度控制 — note 最小, category 和 account 平分剩餘空間 */
-  .tx-list-host table.wire{table-layout:fixed;width:100%}
-  .tx-list-host col.c-date    { width: 72px; }
-  .tx-list-host col.c-cat     { width: 50%; }    /* 和 account 平分剩餘 */
-  .tx-list-host col.c-acc     { width: 50%; }    /* 和 category 平分剩餘 */
-  .tx-list-host col.c-note    { width: 160px; }  /* 固定小空間 */
-  .tx-list-host col.c-amount  { width: 110px; }
-  /* note 欄位過長時截斷 */
-  .tx-list-host td:nth-child(4){
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    color:var(--ink-soft);
-  }
-  /* 可點擊的交易列 + 選中高亮 */
-  .tx-list-host tbody tr{cursor:pointer}
-  .tx-list-host tbody tr:hover td{background:rgba(232,100,58,.08)}
-  .tx-list-host tbody tr.selected td{background:var(--accent-soft)}
 
-  /* 紅色刪除按鈕 (和 goals 共用風格) */
-  .btn.danger{
-    background:#fff;color:var(--rose);border-color:var(--rose);
-    box-shadow:2px 2px 0 var(--rose);
+  /* 右側月曆 panel：不改 shared.css，只控制 transaction 右側 */
+  .tx-right-panel {
+    overflow: hidden;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
-  .btn.danger:hover{background:#ffe5e5}
 
-  @media (max-width: 899px){
-    .tx-list-host col.c-date    { width: 52px; }
-    .tx-list-host col.c-note    { width: 90px; }  /* note 手機更小 */
-    .tx-list-host col.c-amount  { width: 84px; }
-    /* 手機版: 保留左右版型, 內容緊湊塞進一頁 */
-    .tx-grid{
+  /* 紅色刪除按鈕 */
+  .btn.danger {
+    background: #fff;
+    color: var(--rose);
+    border-color: var(--rose);
+    box-shadow: 2px 2px 0 var(--rose);
+  }
+  .btn.danger:hover {
+    background: #ffe5e5;
+  }
+  .tx-action-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .tx-action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .tx-action-row .btn,
+  .tx-delete-full {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+    padding: 6px 12px;
+  }
+
+  .tx-delete-full {
+    margin-top: 2px;
+  }
+
+  /* 查詢列：桌機一行 */
+  .tx-search-row {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: minmax(110px, 1fr) minmax(130px, 1fr) minmax(130px, 1fr) auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    margin-bottom: 4px;
+  }
+  .tx-search-row .input {
+    width: 100%;
+    min-width: 0;
+  }
+  .tx-search-row .btn {
+    white-space: nowrap;
+    padding: 5px 12px;
+  }
+
+  /* 月曆區 */
+  .calendar-panel {
+    flex: 0 0 auto;
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    background: rgba(255,255,255,.22);
+    box-shadow: 3px 3px 0 var(--ink);
+    padding: 8px;
+    margin-top: 4px;
+  }
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .calendar-header h3 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .calendar-header .btn {
+    padding: 4px 10px;
+    font-size: 18px;
+  }
+  .calendar-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin: 6px 0;
+    font-weight: 700;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.4;
+    min-height: 24px;
+    align-items: center;
+  }
+  .calendar-week div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+  }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .calendar-cell {
+    min-height: 50px;
+    border: 1.5px solid var(--ink-soft);
+    border-radius: 8px;
+    background: #fffaf2;
+    padding: 4px;
+    cursor: pointer;
+  }
+  .calendar-cell:hover {
+    background: var(--accent-soft);
+  }
+  .calendar-cell.empty {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .calendar-day {
+    font-family: 'Kalam';
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .calendar-dot-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin-top: 2px;
+  }
+  .calendar-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: 1px solid var(--ink);
+  }
+  .calendar-dot.expense {
+    background: #FDC0AE;
+  }
+  .calendar-dot.income {
+    background: #C0DAB5;
+  }
+  .calendar-amount {
+    font-size: 10px;
+    line-height: 1.05;
+    margin-top: 1px;
+  }
+  .calendar-income {
+    color: var(--ink);
+    background: #C0DAB5;
+    border-radius: 6px;
+    padding: 1px 4px;
+    display: inline-block;
+  }
+  .calendar-expense {
+    color: var(--ink);
+    background: #FDC0AE;
+    border-radius: 6px;
+    padding: 1px 4px;
+    display: inline-block;
+  }
+
+  /* 當日明細：吃掉右側剩餘高度，避免底部大空白 */
+  .day-detail-panel {
+    --tx-table-cols: 80px 1fr 1fr 110px 110px minmax(220px, 1.8fr);
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    background: rgba(255,255,255,.22);
+    box-shadow: 3px 3px 0 var(--ink);
+    padding: 8px 10px;
+    margin-top: 8px;
+    overflow: hidden;
+
+    display: flex;
+    flex-direction: column;
+  }
+  .day-detail-head {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .day-detail-head h3,
+  .day-detail-panel h3 {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1;
+  }
+  .day-detail-count {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  #dayTransactionList {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+  .empty-day-detail {
+    height: 100%;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    color: var(--muted);
+    padding-top: 4px;
+    font-size: 14px;
+  }
+  .transaction-header,
+  .transaction-item {
+    display: grid;
+    grid-template-columns: var(--tx-table-cols);
+    column-gap: 14px;
+    align-items: center;
+  }
+  .transaction-header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding: 6px 12px 8px;
+    border-bottom: 2px solid var(--ink);
+    background: #fffaf2;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .transaction-item {
+    min-height: 46px;
+    border-bottom: 1px dashed var(--ink-soft);
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .transaction-item.tx-expense {
+    border-left: 6px solid #FDC0AE;
+    background: rgba(253, 192, 174, 0.14);
+  }
+  .transaction-item.tx-income {
+    border-left: 6px solid #C0DAB5;
+    background: rgba(192, 218, 181, 0.16);
+  }
+  .transaction-item:hover {
+    filter: brightness(0.98);
+  }
+  .transaction-item.tx-expense:hover {
+    background: rgba(253, 192, 174, 0.24);
+  }
+  .transaction-item.tx-income:hover {
+    background: rgba(192, 218, 181, 0.26);
+  }
+  .tx-cell {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* 類型、類別、帳戶：統一置中 */
+  .tx-cell-type,
+  .tx-cell-category,
+  .tx-cell-account {
+    text-align: center;
+  }
+  /* 類別可稍微粗體 */
+  .tx-cell-category {
+    font-weight: 700;
+  }
+  /* 收入、支出：靠右 */
+  .tx-cell-income,
+  .tx-cell-expense {
+    text-align: right;
+    font-family: 'Kalam', 'Noto Sans TC', sans-serif;
+    font-weight: 700;
+  }
+  /* 備註：靠左，空間最大 */
+  .tx-cell-note {
+    text-align: left;
+    color: var(--muted);
+    font-size: 12px;
+    padding-left: 10px;
+  }
+  /* 表頭對齊規則要跟內容一致 */
+  .transaction-header .tx-cell-type,
+  .transaction-header .tx-cell-category,
+  .transaction-header .tx-cell-account {
+    text-align: center;
+  }
+  .transaction-header .tx-cell-income,
+  .transaction-header .tx-cell-expense {
+    text-align: right;
+  }
+  .transaction-header .tx-cell-note {
+    text-align: left;
+    padding-left: 10px;
+  }
+  .transaction-type-badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 11px;
+    color: var(--ink);
+  }
+  .transaction-type-badge.tx-expense {
+    background: #FDC0AE;
+  }
+  .transaction-type-badge.tx-income {
+    background: #C0DAB5;
+  }
+  .day-detail-pager {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .day-detail-pager button {
+    min-width: 28px;
+    height: 26px;
+    border: 2px solid var(--ink);
+    background: #fff;
+    border-radius: 8px;
+    font-family: 'Caveat';
+    font-size: 15px;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+  .day-detail-pager button.active {
+    background: var(--accent-soft);
+  }
+  .day-detail-pager button:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+    box-shadow: 1px 1px 0 var(--ink);
+  }
+
+  /* 罐罐+1通知 */
+  .reward-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 150px;
+    transform: translateX(-50%) translateY(12px);
+    z-index: 20;
+
+    padding: 10px 18px;
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    background: #fff7df;
+    box-shadow: 4px 4px 0 var(--ink);
+
+    font-family: 'Kalam', 'Noto Sans TC', sans-serif;
+    font-size: 16px;
+    color: var(--ink);
+
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .reward-toast.show {
+    animation: rewardToastFade 2.2s ease forwards;
+  }
+
+  /* 收入 / 支出主題色 */
+  .tx-form-panel {
+    --tx-theme: #FDC0AE;
+    --tx-theme-soft: rgba(253, 192, 174, 0.32);
+    position: relative;
+  }
+  .tx-form-panel.tx-theme-expense {
+    --tx-theme: #FDC0AE;
+    --tx-theme-soft: rgba(253, 192, 174, 0.32);
+  }
+  .tx-form-panel.tx-theme-income {
+    --tx-theme: #C0DAB5;
+    --tx-theme-soft: rgba(192, 218, 181, 0.36);
+  }
+  .tx-form-panel {
+    background: var(--tx-theme-soft);
+  }
+  .tx-form-panel .seg-btn.active {
+    background: var(--tx-theme);
+  }
+  .tx-form-panel .btn.primary {
+    background: var(--tx-theme);
+    color: var(--ink);
+  }
+
+  @keyframes rewardToastFade {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(12px);
+    }
+    15% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    70% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-8px);
+    }
+  }
+
+  @media (max-width: 899px) {
+    .tx-grid {
       grid-template-columns: minmax(180px, 240px) 1fr;
-      gap:6px;
-      flex:1;min-height:0;
+      gap: 6px;
+      flex: 1;
+      min-height: 0;
     }
-    .tx-panel{padding:6px;gap:4px;min-height:0}
-    .tx-panel > form{overflow-y:auto;min-height:0;gap:6px;position:relative}
-    /* form 最後一個 .row (按鈕組) sticky 在底部 */
-    .tx-panel > form > .row:last-child{
-      position:sticky;bottom:0;
-      background:rgba(255,255,255,.95);
-      padding:4px 0;margin-top:auto;
-      z-index:2;
+    .tx-panel {
+      padding: 6px;
+      gap: 4px;
+      min-height: 0;
     }
-    .tx-panel > form .form-spacer{display:none}  /* 手機不需要 spacer */
-    label.field{margin-bottom:2px}
-    label.field span{font-size:11px;margin-bottom:0}
-    .input{font-size:12px;padding:3px 6px}
-    .input.lg{font-size:13px;padding:4px 8px}
-    .tx-panel h3{font-size:14px}
-    .tx-panel .seg-btn{font-size:14px;padding:3px 6px}
-    .tx-panel textarea.input{rows:1;min-height:28px}
-    .tx-list-host{padding:3px;font-size:11px}
-    .tx-list-host th, .tx-list-host td{padding:3px 4px !important}
+    .tx-panel > form {
+      overflow-y: auto;
+      min-height: 0;
+      gap: 6px;
+      position: relative;
+    }
+    .tx-panel > form > .tx-action-wrap {
+      position: sticky;
+      bottom: 0;
+      background: rgba(255,255,255,.95);
+      padding: 4px 0;
+      margin-top: auto;
+      z-index: 2;
+    }
+    .tx-panel > form .form-spacer {
+      display: none;
+    }
+    label.field {
+      margin-bottom: 2px;
+    }
+    label.field span {
+      font-size: 11px;
+      margin-bottom: 0;
+    }
+    .input {
+      font-size: 12px;
+      padding: 3px 6px;
+    }
+    .input.lg {
+      font-size: 13px;
+      padding: 4px 8px;
+    }
+    .tx-panel h3 {
+      font-size: 14px;
+    }
+    .tx-panel .seg-btn {
+      font-size: 14px;
+      padding: 3px 6px;
+    }
+    .tx-panel textarea.input {
+      min-height: 28px;
+    }
+    .tx-search-row {
+      grid-template-columns: 1fr 1fr 1fr auto auto;
+      gap: 4px;
+      padding: 4px;
+      margin-bottom: 2px;
+    }
+    .tx-search-row .input {
+      font-size: 11px;
+      padding: 3px 5px;
+    }
+    .tx-search-row .btn {
+      font-size: 12px;
+      padding: 3px 7px;
+    }
+    .calendar-panel {
+      padding: 5px;
+      margin-top: 4px;
+    }
+    .calendar-header {
+      margin-bottom: 2px;
+    }
+    .calendar-header .btn {
+      font-size: 13px;
+      padding: 3px 7px;
+    }
+    .calendar-header h3 {
+      font-size: 14px;
+    }
+    .calendar-week {
+      min-height: 18px;
+      font-size: 10px;
+      line-height: 1.2;
+      margin: 3px 0;
+      gap: 3px;
+    }
+    .calendar-week div {
+      min-height: 16px;
+    }
+    .calendar-grid {
+      gap: 2px;
+    }
+    .calendar-cell {
+      min-height: 34px;
+      padding: 2px;
+      border-radius: 6px;
+    }
+    .calendar-day {
+      font-size: 10px;
+    }
+    .calendar-dot {
+      width: 4px;
+      height: 4px;
+      margin-top: 1px;
+    }
+    .calendar-amount {
+      font-size: 8px;
+    }
+    .day-detail-panel {
+      padding: 5px;
+      margin-top: 5px;
+    }
+    .day-detail-head {
+      margin-bottom: 3px;
+    }
+    .day-detail-head h3,
+    .day-detail-panel h3 {
+      font-size: 12px;
+    }
+    .day-detail-count {
+      font-size: 10px;
+    }
+    .empty-day-detail {
+      font-size: 10px;
+    }
+    .day-detail-panel {
+      --tx-table-cols: 46px 1fr 54px 58px 58px minmax(70px, 1.2fr);
+      padding: 5px;
+      margin-top: 5px;
+    }
+    .transaction-header,
+    .transaction-item {
+      column-gap: 4px;
+    }
+    .transaction-header {
+      padding: 4px 5px;
+      font-size: 10px;
+    }
+    .transaction-item {
+      min-height: 38px;
+      padding: 4px 5px;
+      font-size: 10px;
+    }
+    .tx-cell-note {
+      font-size: 9px;
+      padding-left: 4px;
+    }
+    .transaction-type-badge {
+      font-size: 9px;
+      padding: 1px 5px;
+    }
+    .day-detail-pager {
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .day-detail-pager button {
+      min-width: 22px;
+      height: 22px;
+      font-size: 12px;
+    }
+    /* 手機版：收入 / 支出月曆點點縮小 */
+    .calendar-dot-row {
+      gap: 2px;
+      margin-top: 1px;
+    }
+    /* 手機版：當日明細的收入 / 支出標籤縮小 */
+    .transaction-type-badge {
+      font-size: 9px;
+      padding: 1px 5px;
+    }
+    /* 手機版：收入 / 支出明細列左側色條縮小 */
+    .transaction-item.tx-expense,
+    .transaction-item.tx-income {
+      border-left-width: 4px;
+      padding-left: 4px;
+    }
+    .tx-action-wrap {
+      gap: 6px;
+    }
+    .tx-action-row {
+      gap: 6px;
+    }
+    .tx-action-row .btn,
+    .tx-delete-full {
+      min-height: 34px;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    .reward-toast {
+      bottom: 70px;
+      font-size: 12px;
+      padding: 7px 12px;
+    }
   }
 </style>
 </head>
@@ -83,87 +656,100 @@
 
 
 <main>
-  <h1 class="page-title" data-page="transactions">Transactions <span class="count" id="txCount">—</span></h1>
-  <p class="page-sub">記錄每一筆收入與支出 · 資料表: transactions · API: /api/transactions</p>
+  <h1 class="page-title" data-page="transactions">我的記帳 <span class="count" id="txCount">—</span></h1>
+  <p class="page-sub">記錄每一筆收入與支出</p>
 
   <div class="tx-grid">
     <!-- LEFT: 新增交易表單 -->
-    <section class="tx-panel">
+    <section class="tx-panel tx-form-panel tx-theme-expense" id="txFormPanel">
       <div class="seg" role="tablist">
-        <button class="seg-btn active" data-type="EXPENSE">EXPENSE</button>
-        <button class="seg-btn" data-type="INCOME">INCOME</button>
+        <button class="seg-btn active" data-type="EXPENSE">支出</button>
+        <button class="seg-btn" data-type="INCOME">收入</button>
       </div>
 
-      <h3 style="margin:0" id="txFormTitle">New transaction</h3>
+      <h3 style="margin:0" id="txFormTitle">新增支出</h3>
 
       <form id="txForm" novalidate>
         <label class="field">
-          <span>transactionAmount</span>
+          <span id="txAmountLabel">支出金額</span>
           <input class="input" id="txAmount" name="transactionAmount" type="number" min="0" step="0.01" placeholder="0" required/>
         </label>
         <label class="field">
-          <span>transactionDate</span>
+          <span id="txDateLabel">支出日期</span>
           <input class="input" id="txDate" name="transactionDate" type="date" required/>
         </label>
         <label class="field">
-          <span>categoryId</span>
+          <span id="txCategoryLabel">支出分類</span>
           <select class="input" id="categorySelect" name="categoryId" required></select>
         </label>
         <label class="field">
-          <span id="accountLabel">accountId (from)</span>
+          <span id="accountLabel">支出帳戶</span>
           <select class="input" id="accountSelect" name="accountId" required></select>
         </label>
         <label class="field">
-          <span>note <small>(optional)</small></span>
-          <textarea class="input" id="txNote" name="note" rows="2" placeholder="optional"></textarea>
+          <span id="txNoteLabel">支出備註<small>（選填）</small></span>
+          <textarea class="input" id="txNote" name="note" rows="2" placeholder="支出備註（選填）"></textarea>
         </label>
-
         <div class="form-spacer"></div>
-        <div class="row" style="gap:8px;margin-top:4px">
-          <button type="button" class="btn danger" id="txDeleteBtn" style="display:none;justify-content:center;padding:6px 12px">🗑 Delete</button>
-          <button type="button" class="btn" id="cancelBtn" style="flex:1;justify-content:center">Clear</button>
-          <button type="submit" class="btn primary" id="saveBtn" style="flex:1;justify-content:center">Save EXPENSE</button>
+        <div class="tx-action-wrap">
+          <!-- 新增模式：清除 / 儲存收入或支出 -->
+          <div class="tx-action-row" id="createActionRow">
+            <button type="button" class="btn" id="cancelBtn">清除</button>
+            <button type="submit" class="btn primary" id="saveBtn">儲存支出</button>
+          </div>
+          <!-- 編輯模式：取消編輯 / 確認編輯 -->
+          <div class="tx-action-row" id="editActionRow" style="display:none">
+            <button type="button" class="btn" id="editCancelBtn">取消編輯</button>
+            <button type="submit" class="btn primary" id="editSaveBtn">確認編輯</button>
+          </div>
+          <!-- 編輯模式底部：刪除這筆記帳 -->
+          <button type="button" class="btn danger tx-delete-full" id="txDeleteBtn" style="display:none">
+            🗑 刪除這筆記帳
+          </button>
         </div>
       </form>
+      <div id="rewardToast" class="reward-toast" hidden>記一筆帳，罐罐+1</div>
     </section>
 
-    <!-- RIGHT: 交易列表 -->
-    <section class="tx-panel">
-      <div class="toolbar" style="margin-bottom:0">
-        <input class="input" id="searchInput" placeholder="🔍 search note" style="max-width:220px"/>
-        <select class="input" id="typeFilter" style="max-width:140px">
-          <option value="">全部</option>
-          <option value="EXPENSE">EXPENSE</option>
-          <option value="INCOME">INCOME</option>
+    <!-- RIGHT: 月曆式交易查詢 -->
+    <section class="tx-panel tx-right-panel">
+      <div class="toolbar trans-filter tx-search-row">
+        <select class="input" id="typeFilter">
+          <option value="">全部類型</option>
+          <option value="EXPENSE">支出</option>
+          <option value="INCOME">收入</option>
         </select>
-        <span class="spacer"></span>
-        <span id="txTotalLabel" style="font-size:13px;color:var(--muted)">—</span>
+        <select class="input" id="accountFilter">
+          <option value="">全部帳戶</option>
+        </select>
+        <select class="input" id="categoryFilter">
+          <option value="">全部分類</option>
+        </select>
+        <button type="button" class="btn primary" id="searchBtn">查詢</button>
+        <button type="button" class="btn" id="clearFilterBtn">清除</button>
       </div>
-
-      <div class="tx-list-host">
-        <table class="wire">
-          <colgroup>
-            <col class="c-date"/>
-            <col class="c-cat"/>
-            <col class="c-acc"/>
-            <col class="c-note"/>
-            <col class="c-amount"/>
-          </colgroup>
-          <thead>
-            <tr>
-              <th>date</th>
-              <th>category</th>
-              <th>account</th>
-              <th>note</th>
-              <th style="text-align:right">amount</th>
-            </tr>
-          </thead>
-          <tbody id="txBody">
-            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">讀取中…</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="wp-pager" id="txPager"></div>
+      <!-- 月曆區 -->
+      <section class="calendar-panel">
+        <div class="calendar-header">
+          <button type="button" class="btn" id="prevMonthBtn">‹ 上個月</button>
+          <h3 id="calendarTitle">YYYY / MM</h3>
+          <button type="button" class="btn" id="nextMonthBtn">下個月 ›</button>
+        </div>
+        <div class="calendar-week">
+          <div>日</div><div>一</div><div>二</div><div>三</div>
+          <div>四</div><div>五</div><div>六</div>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </section>
+      <!-- 點選日期後顯示當日明細 -->
+      <section class="day-detail-panel">
+        <div class="day-detail-head">
+          <h3 id="selectedDateTitle">請選擇日期</h3>
+          <span id="dayDetailCount" class="day-detail-count">—</span>
+        </div>
+        <div id="dayTransactionList"></div>
+        <div class="day-detail-pager" id="dayDetailPager"></div>
+      </section>
     </section>
   </div>
 </main>
@@ -192,68 +778,105 @@
    ============================================================== */
 
 const fmt = WalletPet.format;
-const TX_TYPE = WalletPet.constants.TRANSACTION_TYPE;
-
-/* -- demo fallback data -- */
-const demoCategories = [
-  { categoryId: 'ES001', categoryName: '飲食', categoryType: 'EXPENSE', icon: '🍜', color: '#FF9F43' },
-  { categoryId: 'ES002', categoryName: '衣飾', categoryType: 'EXPENSE', icon: '👕', color: '#A29BFE' },
-  { categoryId: 'ES003', categoryName: '住宅', categoryType: 'EXPENSE', icon: '🏠', color: '#c98a55' },
-  { categoryId: 'ES004', categoryName: '交通', categoryType: 'EXPENSE', icon: '🚇', color: '#4a7bb7' },
-  { categoryId: 'ES005', categoryName: '娛樂', categoryType: 'EXPENSE', icon: '🎬', color: '#e8c55a' },
-  { categoryId: 'ES006', categoryName: '水電', categoryType: 'EXPENSE', icon: '💡', color: '#e8a63a' },
-  { categoryId: 'IS001', categoryName: '薪水', categoryType: 'INCOME',  icon: '💰', color: '#2ECC71' },
-  { categoryId: 'IS002', categoryName: '投資', categoryType: 'INCOME',  icon: '📈', color: '#3498DB' },
-  { categoryId: 'IS003', categoryName: '獎金', categoryType: 'INCOME',  icon: '🎁', color: '#6aa35d' },
-];
-const demoAccounts = [
-  { accountId: 1, accountName: '🏦 中信活存',   currencyCode: 'TWD' },
-  { accountId: 2, accountName: '💸 就學貸款',   currencyCode: 'TWD' },
-  { accountId: 4, accountName: '💵 現金錢包',   currencyCode: 'TWD' },
-];
-const demoTransactions = [
-  { transactionId: 't01', transactionDate: '2026-04-20', note: '☕ Louisa Coffee', transactionAmount:    85, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
-  { transactionId: 't02', transactionDate: '2026-04-20', note: '🛒 全聯',         transactionAmount:   246, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
-  { transactionId: 't03', transactionDate: '2026-04-19', note: '💰 薪資',         transactionAmount: 63000, transactionType: 'INCOME',  accountId: 1, categoryId: 'IS001' },
-  { transactionId: 't04', transactionDate: '2026-04-19', note: '🚇 悠遊卡',       transactionAmount:   100, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES004' },
-  { transactionId: 't05', transactionDate: '2026-04-18', note: '🍜 一蘭拉麵',     transactionAmount:   320, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
-  { transactionId: 't06', transactionDate: '2026-04-17', note: '🎬 威秀',         transactionAmount:   320, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES005' },
-  { transactionId: 't07', transactionDate: '2026-04-16', note: '💡 台電',         transactionAmount:  2340, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES006' },
-  { transactionId: 't08', transactionDate: '2026-04-15', note: '🍔 麥當勞',       transactionAmount:   180, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
-  { transactionId: 't09', transactionDate: '2026-04-14', note: '👕 UNIQLO',       transactionAmount:  1490, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES002' },
-  { transactionId: 't10', transactionDate: '2026-04-13', note: '☕ 星巴克',       transactionAmount:   145, transactionType: 'EXPENSE', accountId: 4, categoryId: 'ES001' },
-  { transactionId: 't11', transactionDate: '2026-04-12', note: '📈 股息',         transactionAmount:  3200, transactionType: 'INCOME',  accountId: 1, categoryId: 'IS002' },
-  { transactionId: 't12', transactionDate: '2026-04-11', note: '🏠 水費',         transactionAmount:   820, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES006' },
-  { transactionId: 't13', transactionDate: '2026-04-10', note: '🎁 年終獎金',     transactionAmount: 24000, transactionType: 'INCOME',  accountId: 1, categoryId: 'IS003' },
-  { transactionId: 't14', transactionDate: '2026-04-09', note: '🚕 Uber',         transactionAmount:   240, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES004' },
-  { transactionId: 't15', transactionDate: '2026-04-08', note: '🍱 7-11 午餐',    transactionAmount:   110, transactionType: 'EXPENSE', accountId: 4, categoryId: 'ES001' },
-  { transactionId: 't16', transactionDate: '2026-04-07', note: '🎵 Spotify',      transactionAmount:   149, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES005' },
-  { transactionId: 't17', transactionDate: '2026-04-06', note: '🛏 IKEA',         transactionAmount:  2890, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES003' },
-  { transactionId: 't18', transactionDate: '2026-04-05', note: '🚇 悠遊卡儲值',   transactionAmount:   500, transactionType: 'EXPENSE', accountId: 4, categoryId: 'ES004' },
-  { transactionId: 't19', transactionDate: '2026-04-04', note: '🍜 鼎泰豐',       transactionAmount:   680, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES001' },
-  { transactionId: 't20', transactionDate: '2026-04-03', note: '💰 打工薪水',     transactionAmount:  8500, transactionType: 'INCOME',  accountId: 1, categoryId: 'IS001' },
-  { transactionId: 't21', transactionDate: '2026-04-02', note: '📱 電話費',       transactionAmount:   599, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES006' },
-  { transactionId: 't22', transactionDate: '2026-04-01', note: '🏀 球鞋',         transactionAmount:  3200, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES002' },
-  { transactionId: 't23', transactionDate: '2026-03-31', note: '🍺 聚餐',         transactionAmount:   850, transactionType: 'EXPENSE', accountId: 4, categoryId: 'ES001' },
-  { transactionId: 't24', transactionDate: '2026-03-30', note: '🎮 Steam 遊戲',   transactionAmount:   420, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES005' },
-  { transactionId: 't25', transactionDate: '2026-03-28', note: '💡 台電繳費',     transactionAmount:  1680, transactionType: 'EXPENSE', accountId: 1, categoryId: 'ES006' },
-];
 
 const state = {
   type: 'EXPENSE',
-  filter: '',
-  typeFilter: '',
-  categories: [],
-  accounts: [],
+
+  // 交易資料
   transactions: [],
+
+  // 左側新增 / 編輯表單用
+  accounts: [],
+  categories: [],
+
+  // 右側查詢篩選用
+  filterAccounts: [],
+  filterCategories: [],
+
+  filter: {
+    type: '',
+    accountId: '',
+    categoryId: ''
+  },
+
+  calendar: {
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    cells: [],
+    days: {},
+    selectedDate: null,
+    selectedItems: [],
+    detailPage: 1,
+    detailPageSize: 8
+  },
+
+  // 目前正在編輯的交易 ID；null 代表新增模式
   editingTxId: null,
+
+  // 每日獎勵、寵物狀態、寵物事件資料
+  dailyReward: null,
+  pet: null,
+  petEvents: []
 };
-const pager = WalletPet.createPager({ pageSize: 10 });
-function adjustPagerSize() {
-  pager.pageSize = window.matchMedia('(max-width: 899px)').matches ? 5 : 10;
+
+function getTxLabel(type = state.type) {
+  return type === 'INCOME' ? '收入' : '支出';
 }
-adjustPagerSize();
-window.addEventListener('resize', () => { adjustPagerSize(); renderList(); });
+
+function getTxThemeClass(type = state.type) {
+  return type === 'INCOME' ? 'tx-theme-income' : 'tx-theme-expense';
+}
+
+function applyTransactionMode(type = state.type, mode = 'create') {
+  const label = getTxLabel(type);
+  const isEdit = mode === 'edit';
+
+  const formPanel = document.getElementById('txFormPanel');
+  if (formPanel) {
+    formPanel.classList.remove('tx-theme-expense', 'tx-theme-income');
+    formPanel.classList.add(getTxThemeClass(type));
+  }
+
+  document.querySelectorAll('.seg-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
+
+  document.getElementById('txFormTitle').textContent =
+    isEdit ? `編輯${label}` : `新增${label}`;
+
+  document.getElementById('txAmountLabel').textContent = `${label}金額`;
+  document.getElementById('txDateLabel').textContent = `${label}日期`;
+  document.getElementById('txCategoryLabel').textContent = `${label}分類`;
+  document.getElementById('accountLabel').textContent = `${label}帳戶`;
+
+  document.getElementById('txNoteLabel').innerHTML =
+    `${label}備註<small>（選填）</small>`;
+
+  document.getElementById('txNote').placeholder =
+    `${label}備註（選填）`;
+
+  document.getElementById('saveBtn').textContent = `儲存${label}`;
+  document.getElementById('cancelBtn').textContent = '清除';
+
+  document.getElementById('editSaveBtn').textContent = '確認編輯';
+  document.getElementById('editCancelBtn').textContent = '取消編輯';
+
+  const createActionRow = document.getElementById('createActionRow');
+  const editActionRow = document.getElementById('editActionRow');
+  const txDeleteBtn = document.getElementById('txDeleteBtn');
+
+  if (createActionRow) {
+    createActionRow.style.display = isEdit ? 'none' : 'grid';
+  }
+
+  if (editActionRow) {
+    editActionRow.style.display = isEdit ? 'grid' : 'none';
+  }
+
+  if (txDeleteBtn) {
+    txDeleteBtn.style.display = isEdit ? 'inline-flex' : 'none';
+  }
+}
 
 /* ---- 下拉資料 ---- */
 function populateCategories() {
@@ -273,213 +896,890 @@ function populateAccounts() {
 
 /* ---- 列表 ---- */
 function lookupCategory(id) {
-  return state.categories.find(c => c.categoryId === id);
+  const allCategories = [
+    ...(state.categories || []),
+    ...(state.filterCategories || [])
+  ];
+
+  return allCategories.find(c => String(c.categoryId) === String(id));
 }
+
 function lookupAccount(id) {
-  return state.accounts.find(a => a.accountId === id);
+  const allAccounts = [
+    ...(state.accounts || []),
+    ...(state.filterAccounts || [])
+  ];
+
+  return allAccounts.find(a => String(a.accountId) === String(id));
 }
-function renderList() {
-  const q = state.filter.toLowerCase();
-  const filtered = state.transactions
-    .filter(t => !state.typeFilter || t.transactionType === state.typeFilter)
-    .filter(t => !q || (t.note || '').toLowerCase().includes(q));
 
-  pager.setItems(filtered);
-  const visible = pager.visible();
+/* ---- calender UI ---- */
+function buildCalendarCells(year, month) {
+  const firstDate = new Date(year, month - 1, 1);
+  const lastDate = new Date(year, month, 0);
 
-  const rows = visible.map(t => {
-    const isExp = t.transactionType === 'EXPENSE';
-    const amt = (isExp ? -1 : 1) * Number(t.transactionAmount);
-    const cat = lookupCategory(t.categoryId);
-    const acc = lookupAccount(t.accountId);
-    const sel = t.transactionId === state.editingTxId ? ' class="selected"' : '';
-    return `<tr${sel} data-tx-id="${t.transactionId}">
-      <td>${fmt.date(t.transactionDate)}</td>
-      <td><span class="pill${isExp ? '' : ' accent'}">${cat ? (cat.icon + ' ' + cat.categoryName) : t.categoryId}</span></td>
-      <td>${acc ? acc.accountName : t.accountId}</td>
-      <td title="${(t.note || '').replace(/"/g, '&quot;')}">${t.note || ''}</td>
-      <td style="text-align:right" class="${isExp ? 'amt-neg' : 'amt-pos'}">${fmt.money(amt, 'TWD', { showSign: true })}</td>
-    </tr>`;
+  const firstDay = firstDate.getDay();
+  const daysInMonth = lastDate.getDate();
+
+  const cells = [];
+
+  for (let i = 0; i < firstDay; i++) {
+    cells.push(null);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    cells.push({
+      day,
+      date
+    });
+  }
+
+  return cells;
+}
+function normalizeDate(value) {
+  if (!value) return '';
+
+  // 後端若回 LocalDate: 2026-05-01
+  // 或 LocalDateTime: 2026-05-01T00:00:00
+  // 都統一轉成 2026-05-01
+  return String(value).substring(0, 10);
+}
+async function loadInitialTransactionMonth() {
+  try {
+    const res = await WalletPet.transactionApi.list({
+      page: 0,
+      size: 1
+    });
+
+    const transactions = extractTransactions(res);
+
+    if (transactions.length > 0 && transactions[0].transactionDate) {
+      const d = new Date(transactions[0].transactionDate);
+
+      if (!isNaN(d.getTime())) {
+        state.calendar.year = d.getFullYear();
+        state.calendar.month = d.getMonth() + 1;
+      }
+    }
+  } catch (e) {
+    console.warn('[transactions] 初始化月份失敗，改用本月', e);
+
+    const now = new Date();
+    state.calendar.year = now.getFullYear();
+    state.calendar.month = now.getMonth() + 1;
+  }
+}
+
+function getTransactionDate(tx) {
+  return normalizeDate(
+    tx.transactionDate ||
+    tx.date ||
+    tx.transaction_date
+  );
+}
+function normalizeTransaction(tx) {
+  if (!tx) return tx;
+
+  return {
+    ...tx,
+
+    // 統一交易 ID
+    transactionId:
+      tx.transactionId ??
+      tx.id ??
+      tx.transaction_id,
+
+    // 統一日期
+    transactionDate:
+      normalizeDate(
+        tx.transactionDate ??
+        tx.date ??
+        tx.transaction_date
+      ),
+
+    // 統一類型
+    transactionType:
+      tx.transactionType ??
+      tx.type ??
+      tx.transaction_type,
+
+    // 統一金額
+    transactionAmount:
+      Number(
+        tx.transactionAmount ??
+        tx.amount ??
+        tx.transaction_amount ??
+        0
+      ),
+
+    // 統一帳戶 / 分類
+    accountId:
+      tx.accountId ??
+      tx.account_id,
+
+    categoryId:
+      tx.categoryId ??
+      tx.category_id,
+
+    accountName:
+      tx.accountName ??
+      tx.account_name,
+
+    categoryName:
+      tx.categoryName ??
+      tx.category_name,
+  };
+}
+
+function extractTransactions(res) {
+  const payload = res?.data || res;
+
+  const candidates = [
+    payload?.items,
+    payload?.content,
+    payload?.transactions,
+    payload?.transactionList,
+    payload?.records,
+    payload?.list,
+    payload?.page?.content,
+    Array.isArray(payload) ? payload : null,
+  ];
+
+  const arr = candidates.find(Array.isArray) || [];
+
+  return arr.map(normalizeTransaction);
+}
+function groupTransactionsByDate(transactions) {
+  const days = {};
+
+  transactions.forEach(tx => {
+    const date = getTransactionDate(tx);
+    if (!date) return;
+
+    if (!days[date]) {
+      days[date] = {
+        income: 0,
+        expense: 0,
+        count: 0,
+        items: []
+      };
+    }
+
+    const amount = Number(tx.transactionAmount || 0);
+
+    if (tx.transactionType === 'INCOME') {
+      days[date].income += amount;
+    }
+
+    if (tx.transactionType === 'EXPENSE') {
+      days[date].expense += amount;
+    }
+
+    days[date].count += 1;
+    days[date].items.push(tx);
+  });
+
+  return days;
+}
+
+function renderCalendar() {
+  const year = state.calendar.year;
+  const month = state.calendar.month;
+
+  document.getElementById('calendarTitle').textContent =
+    `${year} / ${String(month).padStart(2, '0')}`;
+
+  const html = state.calendar.cells.map(cell => {
+    if (!cell) {
+      return `<div class="calendar-cell empty"></div>`;
+    }
+
+    const dayData = state.calendar.days[cell.date];
+
+    return `
+      <div class="calendar-cell" data-date="${cell.date}">
+        <div class="calendar-day">${cell.day}</div>
+
+        ${
+          dayData
+            ? `
+              <div class="calendar-dot-row">
+                ${dayData.expense > 0 ? '<span class="calendar-dot expense" title="支出"></span>' : ''}
+                ${dayData.income > 0 ? '<span class="calendar-dot income" title="收入"></span>' : ''}
+              </div>
+
+              <div class="calendar-amount">
+                ${dayData.count} 筆
+              </div>
+
+              ${
+                dayData.expense > 0
+                  ? `<div class="calendar-amount calendar-expense">支出 ${dayData.expense}</div>`
+                  : ''
+              }
+
+              ${
+                dayData.income > 0
+                  ? `<div class="calendar-amount calendar-income">收入 ${dayData.income}</div>`
+                  : ''
+              }
+            `
+            : ''
+        }
+      </div>
+    `;
   }).join('');
 
-  document.getElementById('txBody').innerHTML = rows ||
-    '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">無符合條件的交易</td></tr>';
-  document.getElementById('txCount').textContent = state.transactions.length + ' entries';
-
-  const total = filtered.reduce((s, t) => {
-    const sign = t.transactionType === 'EXPENSE' ? -1 : 1;
-    return s + sign * Number(t.transactionAmount);
-  }, 0);
-  const totalEl = document.getElementById('txTotalLabel');
-  totalEl.textContent = `共 ${filtered.length} 筆 · 淨額 ${fmt.money(total, 'TWD', { showSign: true })}`;
-
-  pager.renderInto('txPager', renderList);
+  document.getElementById('calendarGrid').innerHTML = html;
 }
+
+document.getElementById('calendarGrid').addEventListener('click', e => {
+  const cell = e.target.closest('.calendar-cell[data-date]');
+  if (!cell) return;
+
+  const date = cell.dataset.date;
+  state.calendar.selectedDate = date;
+
+  const dayData = state.calendar.days[date];
+
+  state.calendar.selectedItems = dayData ? dayData.items : [];
+  state.calendar.detailPage = 1;
+
+  renderDayDetail();
+});
+
+function renderDayDetail() {
+  const title = document.getElementById('selectedDateTitle');
+  const list = document.getElementById('dayTransactionList');
+  const count = document.getElementById('dayDetailCount');
+  const pager = document.getElementById('dayDetailPager');
+
+  let items = [];
+
+  if (state.calendar.selectedDate) {
+    items = state.calendar.selectedItems || [];
+    title.textContent = `${state.calendar.selectedDate} 交易明細`;
+  } else {
+    items = state.transactions || [];
+
+    const hasFilter =
+      state.filter.type ||
+      state.filter.accountId ||
+      state.filter.categoryId;
+
+    title.textContent = hasFilter ? '查詢結果' : '本月交易明細';
+  }
+
+  const pageSize = state.calendar.detailPageSize || 8;
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+
+  if (state.calendar.detailPage > totalPages) {
+    state.calendar.detailPage = totalPages;
+  }
+
+  const currentPage = state.calendar.detailPage;
+  const start = (currentPage - 1) * pageSize;
+  const pageItems = items.slice(start, start + pageSize);
+
+  count.textContent = `${items.length} 筆`;
+
+  if (items.length === 0) {
+    list.innerHTML = `<div class="empty-day-detail">目前沒有交易資料</div>`;
+    pager.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = `
+  <div class="transaction-header">
+    <span class="tx-cell tx-cell-type">類型</span>
+    <span class="tx-cell tx-cell-category">類別</span>
+    <span class="tx-cell tx-cell-account">帳戶</span>
+    <span class="tx-cell tx-cell-income">收入</span>
+    <span class="tx-cell tx-cell-expense">支出</span>
+    <span class="tx-cell tx-cell-note">備註</span>
+  </div>
+
+  ${pageItems.map(tx => {
+    const cat = lookupCategory(tx.categoryId);
+    const acc = lookupAccount(tx.accountId);
+    const isIncome = tx.transactionType === 'INCOME';
+    const itemClass = isIncome ? 'tx-income' : 'tx-expense';
+    const typeText = isIncome ? '收入' : '支出';
+
+    const categoryText =
+      cat ? `${cat.icon || ''} ${cat.categoryName}` :
+      tx.categoryName || tx.categoryId || '未分類';
+
+    const accountText =
+      acc ? acc.accountName :
+      tx.accountName || tx.accountId || '';
+
+    const amount = Number(tx.transactionAmount || 0);
+
+    return `
+      <div class="transaction-item ${itemClass}" data-tx-id="${tx.transactionId}">
+        <span class="tx-cell tx-cell-type">
+          <span class="transaction-type-badge ${itemClass}">${typeText}</span>
+        </span>
+
+        <span class="tx-cell tx-cell-category" title="${categoryText}">
+          ${categoryText}
+        </span>
+
+        <span class="tx-cell tx-cell-account" title="${accountText}">
+          ${accountText}
+        </span>
+
+        <span class="tx-cell tx-cell-income">
+          ${isIncome ? `<span class="calendar-income">+${amount}</span>` : ''}
+        </span>
+
+        <span class="tx-cell tx-cell-expense">
+          ${!isIncome ? `<span class="calendar-expense">-${amount}</span>` : ''}
+        </span>
+
+        <span class="tx-cell tx-cell-note" title="${tx.note || ''}">
+          ${tx.note || ''}
+        </span>
+      </div>
+    `;
+  }).join('')}
+`;
+
+  renderDayDetailPager(totalPages, currentPage);
+}
+
+function renderDayDetailPager(totalPages, currentPage) {
+  const pager = document.getElementById('dayDetailPager');
+
+  if (totalPages <= 1) {
+    pager.innerHTML = '';
+    return;
+  }
+
+  let html = '';
+
+  html += `
+    <button type="button" data-page="${currentPage - 1}" ${currentPage <= 1 ? 'disabled' : ''}>
+      ‹
+    </button>
+  `;
+
+  for (let p = 1; p <= totalPages; p++) {
+    html += `
+      <button type="button" data-page="${p}" class="${p === currentPage ? 'active' : ''}">
+        ${p}
+      </button>
+    `;
+  }
+
+  html += `
+    <button type="button" data-page="${currentPage + 1}" ${currentPage >= totalPages ? 'disabled' : ''}>
+      ›
+    </button>
+  `;
+
+  pager.innerHTML = html;
+}
+
+document.getElementById('dayDetailPager').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-page]');
+  if (!btn || btn.disabled) return;
+
+  const nextPage = Number(btn.dataset.page);
+  if (!nextPage) return;
+
+  state.calendar.detailPage = nextPage;
+  renderDayDetail();
+});
+
+document.getElementById('dayTransactionList').addEventListener('click', e => {
+  const item = e.target.closest('.transaction-item[data-tx-id]');
+  if (!item) return;
+
+  const t = state.transactions.find(
+    x => String(x.transactionId) === String(item.dataset.txId)
+  );
+
+  if (t) enterTxEditMode(t);
+});
+
+document.getElementById('prevMonthBtn').addEventListener('click', async () => {
+  state.calendar.month -= 1;
+
+  if (state.calendar.month < 1) {
+    state.calendar.month = 12;
+    state.calendar.year -= 1;
+  }
+
+  state.calendar.selectedDate = null;
+  state.calendar.selectedItems = [];
+  state.calendar.detailPage = 1;
+  await loadTransactions();
+  renderDayDetail();
+});
+
+document.getElementById('nextMonthBtn').addEventListener('click', async () => {
+  state.calendar.month += 1;
+
+  if (state.calendar.month > 12) {
+    state.calendar.month = 1;
+    state.calendar.year += 1;
+  }
+
+  state.calendar.selectedDate = null;
+  state.calendar.selectedItems = [];
+  state.calendar.detailPage = 1;
+
+  await loadTransactions();
+  renderDayDetail();
+});
 
 /* ---- EXPENSE / INCOME 切換 ---- */
 document.querySelectorAll('.seg-btn').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.seg-btn').forEach(x => x.classList.toggle('active', x === b));
+  b.addEventListener('click', async () => {
     state.type = b.dataset.type;
-    populateCategories();
-    document.getElementById('saveBtn').textContent = 'Save ' + state.type;
-    document.getElementById('accountLabel').textContent =
-      state.type === 'EXPENSE' ? 'accountId (from)' : 'accountId (to)';
+    state.editingTxId = null;
+
+    await loadFormMeta();
+
+    resetTxForm();
   });
 });
 
 /* ========================================================
    Transaction form: new / edit / delete
    ======================================================== */
-function enterTxEditMode(t) {
+async function enterTxEditMode(t) {
   state.editingTxId = t.transactionId;
-  // 先切到對應的 type(EXPENSE/INCOME)
-  if (t.transactionType !== state.type) {
-    state.type = t.transactionType;
-    document.querySelectorAll('.seg-btn').forEach(x =>
-      x.classList.toggle('active', x.dataset.type === state.type));
-    populateCategories();
-    document.getElementById('accountLabel').textContent =
-      state.type === 'EXPENSE' ? 'accountId (from)' : 'accountId (to)';
-  }
-  // 填欄位
-  document.getElementById('txAmount').value  = t.transactionAmount;
-  document.getElementById('txDate').value    = t.transactionDate;
+  state.type = t.transactionType;
+
+  applyTransactionMode(state.type, 'edit');
+
+  await loadFormMeta();
+
+  document.getElementById('txAmount').value = t.transactionAmount;
+  document.getElementById('txDate').value = t.transactionDate;
   document.getElementById('categorySelect').value = t.categoryId;
-  document.getElementById('accountSelect').value  = t.accountId;
-  document.getElementById('txNote').value    = t.note || '';
-  // 切 UI
-  document.getElementById('txFormTitle').textContent = 'Edit transaction';
-  document.getElementById('saveBtn').textContent     = 'Save changes';
-  document.getElementById('cancelBtn').textContent   = 'Cancel';
-  document.getElementById('txDeleteBtn').style.display = 'inline-flex';
-  renderList();   // 讓 selected 高亮生效
+  document.getElementById('accountSelect').value = t.accountId;
+  document.getElementById('txNote').value = t.note || '';
+
+  renderCalendar();
+  renderDayDetail();
 }
 
 function resetTxForm() {
   state.editingTxId = null;
+
   document.getElementById('txForm').reset();
   document.getElementById('txDate').value = fmt.today();
-  document.getElementById('txFormTitle').textContent = 'New transaction';
-  document.getElementById('saveBtn').textContent     = 'Save ' + state.type;
-  document.getElementById('cancelBtn').textContent   = 'Clear';
-  document.getElementById('txDeleteBtn').style.display = 'none';
-  renderList();
-}
 
-/* 點列進入 edit mode */
-document.getElementById('txBody').addEventListener('click', e => {
-  const tr = e.target.closest('tr[data-tx-id]');
-  if (!tr) return;
-  const t = state.transactions.find(x => String(x.transactionId) === tr.dataset.txId);
-  if (t) enterTxEditMode(t);
-});
+  populateCategories();
+  populateAccounts();
+
+  const categorySelect = document.getElementById('categorySelect');
+  const accountSelect = document.getElementById('accountSelect');
+
+  if (categorySelect.options.length > 0) {
+    categorySelect.selectedIndex = 0;
+  }
+
+  if (accountSelect.options.length > 0) {
+    accountSelect.selectedIndex = 0;
+  }
+
+  applyTransactionMode(state.type, 'create');
+
+  renderCalendar();
+  renderDayDetail();
+}
 
 /* Delete */
 document.getElementById('txDeleteBtn').addEventListener('click', async () => {
   if (!state.editingTxId) return;
-  const t = state.transactions.find(x => x.transactionId === state.editingTxId);
+  const deletingId = state.editingTxId;
+  const t = state.transactions.find(x => String(x.transactionId) === String(deletingId));
   if (!t) return;
-  const label = (t.note || (lookupCategory(t.categoryId)?.categoryName) || t.transactionId);
-  if (!confirm(`確認刪除交易「${label}」(${fmt.date(t.transactionDate)})? 此操作無法復原。`)) return;
-  try {
-    await WalletPet.transactionApi.remove(state.editingTxId);
-  } catch (ex) {
-    console.warn('[transactions] 刪除失敗, 本地模擬');
+  const typeText = getTxLabel(t.transactionType);
+  const label = t.note || lookupCategory(t.categoryId)?.categoryName || t.transactionId;
+  if (!confirm(`確認刪除這筆${typeText}「${label}」嗎？\n日期：${fmt.date(t.transactionDate)}\n此操作無法復原。`)) {
+    return;
   }
-  state.transactions = state.transactions.filter(x => x.transactionId !== state.editingTxId);
-  resetTxForm();
+  try {
+    await WalletPet.transactionApi.remove(deletingId);
+    await refreshAfterTransaction(t.transactionDate);
+    resetTxForm();
+  } catch (ex) {
+    alert(ex.message || '刪除交易失敗');
+  }
 });
 
 /* ---- 表單送出 (new or edit) ---- */
-document.getElementById('txForm').addEventListener('submit', async (e) => {
+document.getElementById('txForm').addEventListener('submit', async function (e) {
   e.preventDefault();
+
   const body = {
-    accountId:         Number(document.getElementById('accountSelect').value),
-    categoryId:        document.getElementById('categorySelect').value,
+    transactionType: state.type,
+    accountId: Number(document.getElementById('accountSelect').value),
+    categoryId: document.getElementById('categorySelect').value,
     transactionAmount: Number(document.getElementById('txAmount').value),
-    transactionType:   state.type,
-    transactionDate:   document.getElementById('txDate').value,
-    note:               document.getElementById('txNote').value || null,
+    transactionDate: document.getElementById('txDate').value,
+    note: document.getElementById('txNote').value.trim(),
   };
-  if (!body.transactionAmount || body.transactionAmount <= 0) {
-    alert('金額必須大於 0');
+
+  if (!body.accountId || !body.categoryId || !body.transactionAmount || !body.transactionDate) {
+    alert(`請完整填寫${getTxLabel()}金額、日期、分類與帳戶`);
     return;
   }
 
   if (state.editingTxId) {
-    // UPDATE
     try {
-      const updated = await WalletPet.transactionApi.update(state.editingTxId, body);
-      const idx = state.transactions.findIndex(x => x.transactionId === state.editingTxId);
-      if (idx >= 0) state.transactions[idx] = updated || { ...state.transactions[idx], ...body };
+      await WalletPet.transactionApi.update(state.editingTxId, body);
+      await refreshAfterTransaction(body.transactionDate);
+      resetTxForm();
     } catch (ex) {
-      console.warn('[transactions] 更新失敗, 本地模擬');
-      const idx = state.transactions.findIndex(x => x.transactionId === state.editingTxId);
-      if (idx >= 0) state.transactions[idx] = { ...state.transactions[idx], ...body };
+      alert(ex.message || '修改交易失敗');
     }
-  } else {
-    // CREATE
-    let created = null;
-    try {
-      created = await WalletPet.transactionApi.create(body);
-      state.transactions.unshift(created);
-    } catch (ex) {
-      console.warn('[transactions] 新增失敗, 本地模擬');
-      created = { transactionId: 't_local_' + Date.now(), ...body };
-      state.transactions.unshift(created);
-    }
-
-    /* cancan 系統 hook:每筆記帳成功後請後端發 +1 cancan(每日上限 +5)
-       後端尚未實作 4 組 TransactionService 之前,先在前端接;
-       未來 4 組把這段移到 TransactionServiceImpl#create 內呼叫 petService.claimBookkeepingReward
-       後,可把這段刪掉。 */
-    try {
-      const userId = localStorage.getItem('walletpet.userId');
-      const petId  = localStorage.getItem('walletpet.petId');
-      if (userId && petId) {
-        const updatedPet = await WalletPet.petApi.claimBookkeeping({
-          userId,
-          petId,
-          transactionId: created && created.transactionId ? String(created.transactionId) : null,
-        });
-        if (updatedPet) WalletPet.updatePetStatus(updatedPet);
-      } else {
-        console.info('[transactions] 沒有 userId / petId 快取,跳過 cancan 獎勵');
-      }
-    } catch (ex) {
-      // 後端未啟動 / 端點未實作 — 不影響交易主流程
-      console.warn('[transactions] cancan 獎勵呼叫失敗', ex);
-    }
+    return;
   }
+
+  // CREATE
+  const rewardDate = body.transactionDate;
+  // 1. 新增交易前，先查今天已發多少 cancan
+  let beforeReward = null;
+  try {
+    beforeReward = await WalletPet.dailyRewardApi.today(rewardDate);
+  } catch (e) {
+    beforeReward = { cancanDelta: 0 };
+  }
+  // 2. 新增交易
+  try {
+    await WalletPet.transactionApi.create(body);
+  } catch (ex) {
+    alert(ex.message || '新增交易失敗');
+    return;
+  }
+  // 3. 新增交易後，再查一次今天已發多少 cancan
+  let afterReward = null;
+  try {
+    afterReward = await WalletPet.dailyRewardApi.today(rewardDate);
+  } catch (e) {
+    afterReward = beforeReward;
+  }
+  // 4. 判斷這次新增交易有沒有真的拿到罐罐
+  const beforeCancanDelta = Number(beforeReward?.cancanDelta || 0);
+  const afterCancanDelta = Number(afterReward?.cancanDelta || 0);
+  const gained = afterCancanDelta - beforeCancanDelta;
+
+  if (gained > 0) {
+    showRewardToast(
+      gained === 1
+        ? '記一筆帳，罐罐+1'
+        : `記一筆帳，罐罐+${gained}`
+    );
+  }
+  // 5. 重新載入交易、表單選項、每日獎勵、寵物狀態、寵物事件
+  await refreshAfterTransaction(rewardDate);
   resetTxForm();
 });
 
-document.getElementById('cancelBtn').addEventListener('click', resetTxForm);
+//罐罐+1呼叫
+function showRewardToast(text = '記一筆帳，罐罐+1') {
+  const toast = document.getElementById('rewardToast');
+  if (!toast) return;
 
-document.getElementById('searchInput').addEventListener('input', e => {
-  state.filter = e.target.value; pager.goTo(1); renderList();
+  toast.textContent = text;
+  toast.hidden = false;
+  toast.classList.remove('show');
+
+  // 強制重啟動畫
+  void toast.offsetWidth;
+
+  toast.classList.add('show');
+
+  window.setTimeout(() => {
+    toast.classList.remove('show');
+    toast.hidden = true;
+  }, 2300);
+}
+
+//查詢按鈕事件
+function syncFilterFromInputs() {
+  state.filter.type = document.getElementById('typeFilter').value;
+  state.filter.accountId = document.getElementById('accountFilter').value;
+  state.filter.categoryId = document.getElementById('categoryFilter').value;
+}
+
+document.getElementById('searchBtn').addEventListener('click', async () => {
+  syncFilterFromInputs();
+
+  state.calendar.selectedDate = null;
+  state.calendar.selectedItems = [];
+  state.calendar.detailPage = 1;
+
+  await loadTransactions();
+  renderDayDetail();
 });
-document.getElementById('typeFilter').addEventListener('change', e => {
-  state.typeFilter = e.target.value; pager.goTo(1); renderList();
+
+document.getElementById('clearFilterBtn').addEventListener('click', async () => {
+  document.getElementById('typeFilter').value = '';
+  document.getElementById('accountFilter').value = '';
+  document.getElementById('categoryFilter').value = '';
+
+  state.filter = {
+    type: '',
+    accountId: '',
+    categoryId: ''
+  };
+
+  state.calendar.selectedDate = null;
+  state.calendar.selectedItems = [];
+  state.calendar.detailPage = 1;
+
+  await loadTransactions();
+  renderDayDetail();
+});
+
+async function loadFormMeta() {
+  try {
+    const meta = await WalletPet.transactionApi.formMeta(state.type);
+    state.accounts = meta.accounts || [];
+    state.categories = meta.categories || [];
+  } catch (e) {
+    console.warn('資料載入失敗請先登入', e);
+  }
+
+  populateAccounts();
+  populateCategories();
+}
+
+async function loadAccountOptions() {
+  try {
+    const accounts = await WalletPet.accountApi.list();
+
+    state.filterAccounts = accounts || [];
+
+    const select = document.getElementById('accountFilter');
+    select.innerHTML = '<option value="">全部帳戶</option>';
+
+    state.filterAccounts.forEach(acc => {
+      select.innerHTML += `
+        <option value="${acc.accountId}">
+          ${acc.accountName}
+        </option>
+      `;
+    });
+  } catch (e) {
+    console.warn('[transactions] 帳戶選單載入失敗', e);
+    state.filterAccounts = [];
+  }
+}
+
+async function loadCategoryOptions() {
+  try {
+    state.filterCategories = await WalletPet.categoryApi.list({
+      includeDisabled: true
+    });
+  } catch (e) {
+    console.warn('[transactions] 分類選單載入失敗', e);
+    state.filterCategories = [];
+  }
+
+  renderCategoryFilterOptions();
+}
+
+function renderCategoryFilterOptions() {
+  const type = document.getElementById('typeFilter').value;
+  const categorySelect = document.getElementById('categoryFilter');
+
+  const currentCategoryId = categorySelect.value;
+
+  const categories = (state.filterCategories || []).filter(cat => {
+    if (!type) return true;
+    return cat.categoryType === type;
+  });
+
+  categorySelect.innerHTML = '<option value="">全部分類</option>';
+
+  categories.forEach(cat => {
+    const disabledText = cat.isDisable ? '（停用）' : '';
+    const typeText = cat.categoryType === 'EXPENSE' ? '支出' : '收入';
+
+    categorySelect.innerHTML += `
+      <option value="${cat.categoryId}">
+        ${cat.categoryName}${disabledText} - ${typeText}
+      </option>
+    `;
+  });
+
+  const stillExists = categories.some(
+    cat => String(cat.categoryId) === String(currentCategoryId)
+  );
+
+  if (stillExists) {
+    categorySelect.value = currentCategoryId;
+  } else {
+    categorySelect.value = '';
+    state.filter.categoryId = '';
+  }
+}
+
+async function loadTransactions() {
+  const year = state.calendar.year;
+  const month = state.calendar.month;
+
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  try {
+    const res = await WalletPet.transactionApi.list({
+      startDate,
+      endDate,
+      type: state.filter.type,
+      accountId: state.filter.accountId,
+      categoryId: state.filter.categoryId,
+      page: 0,
+      size: 100
+    });
+
+    const payload = res?.data || res;
+
+    state.transactions = extractTransactions(res);
+    state.summary = payload?.summary || null;
+
+    console.log('[transactions] 查詢區間:', startDate, endDate);
+    console.log('[transactions] API 原始回傳:', res);
+    console.log('[transactions] 解析後交易:', state.transactions);
+
+    state.calendar.cells = buildCalendarCells(year, month);
+    state.calendar.days = groupTransactionsByDate(state.transactions);
+
+    document.getElementById('txCount').textContent =
+      `${state.transactions.length} 筆`;
+
+    renderCalendar();
+
+  } catch (e) {
+    console.warn('[transactions] 交易載入失敗', e);
+
+    state.transactions = [];
+    state.summary = null;
+    state.calendar.cells = buildCalendarCells(year, month);
+    state.calendar.days = {};
+
+    document.getElementById('txCount').textContent = '0 筆';
+
+    renderCalendar();
+  }
+}
+
+async function refreshDailyReward(date) {
+  try {
+    state.dailyReward = await WalletPet.dailyRewardApi.today(date);
+  } catch (e) {
+    console.warn('[transactions] daily reward reload failed', e);
+  }
+}
+
+async function refreshPet() {
+  try {
+    const pet = await WalletPet.petApi.me();
+    WalletPet.updatePetStatus(pet);
+    state.pet = pet;
+  } catch (e) {
+    console.warn('[transactions] pet reload failed', e);
+  }
+}
+
+async function refreshPetEvents() {
+  try {
+    state.petEvents = await WalletPet.petEventApi.list({ page: 0, size: 10 });
+  } catch (e) {
+    console.warn('[transactions] pet events reload failed', e);
+  }
+}
+
+async function refreshAfterTransaction(date) {
+  if (date) {
+    const normalized = normalizeDate(date);
+    const [year, month] = normalized.split('-');
+
+    if (year && month) {
+      state.calendar.year = Number(year);
+      state.calendar.month = Number(month);
+      state.calendar.selectedDate = normalized;
+      state.calendar.detailPage = 1;
+    }
+  }
+
+  await loadFormMeta();
+  await loadTransactions();
+
+  const selected = state.calendar.selectedDate;
+  const dayData = selected ? state.calendar.days[selected] : null;
+  state.calendar.selectedItems = dayData ? dayData.items : [];
+
+  renderDayDetail();
+
+  await Promise.allSettled([
+    refreshDailyReward(date),
+    refreshPet(),
+    refreshPetEvents(),
+  ]);
+}
+
+document.getElementById('cancelBtn').addEventListener('click', resetTxForm);
+document.getElementById('editCancelBtn').addEventListener('click', resetTxForm);
+
+['accountFilter', 'categoryFilter'].forEach(id => {
+  document.getElementById(id).addEventListener('change', async () => {
+    syncFilterFromInputs();
+
+    state.calendar.selectedDate = null;
+    state.calendar.selectedItems = [];
+    state.calendar.detailPage = 1;
+
+    await loadTransactions();
+    renderDayDetail();
+  });
+});
+
+document.getElementById('typeFilter').addEventListener('change', async () => {
+  renderCategoryFilterOptions();
+  syncFilterFromInputs();
+
+  state.calendar.selectedDate = null;
+  state.calendar.selectedItems = [];
+  state.calendar.detailPage = 1;
+
+  await loadTransactions();
+  renderDayDetail();
 });
 
 /* ---- 初始化 ---- */
 async function init() {
   document.getElementById('txDate').value = fmt.today();
 
-  try { state.categories = await WalletPet.categoryApi.list(); }
-  catch { state.categories = demoCategories; }
+  applyTransactionMode(state.type, 'create');
 
-  try { state.accounts = await WalletPet.accountApi.list(); }
-  catch { state.accounts = demoAccounts; }
+  await loadFormMeta();
+  await loadAccountOptions();
+  await loadCategoryOptions();
 
-  try { state.transactions = await WalletPet.transactionApi.list(); }
-  catch { state.transactions = demoTransactions; }
+  // 先找最近一筆交易在哪個月份
+  await loadInitialTransactionMonth();
 
-  populateCategories();
-  populateAccounts();
-  renderList();
+  // 再查該月份交易
+  await loadTransactions();
+
+  await refreshPet();
+  await refreshPetEvents();
+  await refreshDailyReward(fmt.today());
+
+  renderDayDetail();
 }
 init();
 </script>

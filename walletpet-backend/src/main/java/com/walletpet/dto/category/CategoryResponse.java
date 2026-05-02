@@ -11,8 +11,6 @@ public class CategoryResponse {
 
     private String categoryId;
 
-    private String userId;
-
     private String categoryName;
 
     private CategoryType categoryType;

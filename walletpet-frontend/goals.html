@@ -356,41 +356,44 @@
         <section class="gb-panel">
           <h3 style="margin:0" id="budgetFormTitle">New budget</h3>
           <form id="budgetForm" novalidate>
+            <!-- 1. 預算名稱：改為文字輸入 input -->
             <label class="field">
-              <span>budgetScope</span>
-              <select class="input" id="bdScope" name="budgetScope">
-                <option value="MONTH">MONTH</option>
-                <option value="WEEK">WEEK</option>
-                <option value="CUSTOM">CUSTOM</option>
+              <span>預算名稱 (Scope)</span>
+              <input class="input" id="bdScope" name="budgetScope" type="text" placeholder="例如：五月份伙食費" required />
+            </label>
+
+            <!-- 2. 支出類型：改為隱藏欄位，固定值為 EXPENSE -->
+            <input type="hidden" id="bdTarget" name="targetType" value="EXPENSE">
+
+            <!-- 3. 分類選擇：我們會透過 JS 動態載入 EXPENSE 分類 -->
+            <label class="field">
+              <span>預算分類 <small>(僅限支出類別)</small></span>
+              <select class="input" id="bdCategory" name="categoryId" required>
+                <option value="">-- 請選擇分類 --</option>
               </select>
             </label>
+
             <label class="field">
-              <span>targetType</span>
-              <select class="input" id="bdTarget" name="targetType">
-                <option value="CATEGORY">CATEGORY (單一類別)</option>
-                <option value="TOTAL">TOTAL (整體支出)</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>categoryId <small>(nullable for TOTAL)</small></span>
-              <select class="input" id="bdCategory" name="categoryId"></select>
-            </label>
-            <label class="field">
-              <span>budgetAmount</span>
+              <span>預算金額 (Amount)</span>
               <input class="input" id="bdAmount" name="budgetAmount" type="number" min="0" step="1" placeholder="8000"
                 required />
             </label>
+
             <div class="row" style="gap:10px">
               <label class="field" style="flex:1">
-                <span>startDate</span>
+                <span>開始日期</span>
                 <input class="input" id="bdStart" name="startDate" type="date" required />
               </label>
+
               <label class="field" style="flex:1">
-                <span>endDate</span>
+                <span>結束日期</span>
+                <!-- 注意：input 必須放在 label 裡面，且 label 放在 row 裡面 -->
                 <input class="input" id="bdEnd" name="endDate" type="date" required />
               </label>
             </div>
+
             <div class="form-spacer"></div>
+
             <div class="row" style="gap:8px;margin-top:4px">
               <button type="button" class="btn danger" id="budgetDeleteBtn"
                 style="display:none;justify-content:center;padding:6px 12px">🗑 Delete</button>
@@ -409,13 +412,13 @@
             <table class="wire">
               <thead>
                 <tr>
-                  <th>budgetScope</th>
-                  <th>targetType</th>
-                  <th>categoryId</th>
-                  <th>budgetAmount</th>
-                  <th>used</th>
-                  <th>startDate</th>
-                  <th>endDate</th>
+                  <th>預算名稱</th>
+                  <th>消費種類</th>
+                  <th>消費金額</th>
+                  <th>上限金額</th>
+                  <th>使用%數</th>
+                  <th>開始日期</th>
+                  <th>結束日期</th>
                 </tr>
               </thead>
               <tbody id="budgetTableBody">
@@ -588,50 +591,75 @@
       budgetsPager.setItems(state.budgets);
       const visible = budgetsPager.visible();
 
-      const cards = visible.map(b => {
-        const ratio = b.budgetAmount ? b.usedAmount / b.budgetAmount : 0;
-        const pct = Math.min(ratio, 1.2);
-        const cat = lookupCategory(b.categoryId);
-        const title = b.targetType === 'TOTAL'
-          ? '🛒 TOTAL'
-          : (cat ? `${cat.icon} ${cat.categoryName}` : b.categoryId);
-        const over = ratio > 1;
-        const sel = b.budgetId === state.editingBudgetId ? ' selected' : '';
-        return `<div class="card${sel}" data-budget-id="${b.budgetId}">
+      // 1. 處理上方卡片區 (Cards)
+      const cards = visible.map(result => {
+        const b = result.budget;
+        if (!b) return ''; // 安全檢查
+
+        // 【修正點】：現在優先顯示我們自定義的「預算名稱 (budgetScope)」
+        const title = b.budgetScope || (result.categoryName ? result.categoryName : '未命名預算');
+        const over = result.progress > 1;
+
+        return `
+    <div class="card" data-budget-id="${b.budgetId}" onclick="loadBudgetToForm('${b.budgetId}')" style="cursor: pointer;">
       <h3>${title}</h3>
-      <div class="kpi"><span class="n">${fmt.money(b.usedAmount)}</span><span class="l">/ ${fmt.money(b.budgetAmount)}</span></div>
-      <div class="bar stripe${over ? ' over' : ''}"><i style="width:${(pct * 100).toFixed(0)}%"></i></div>
+      <div class="kpi">
+        <span class="n">${fmt.money(result.currentSpent)}</span>
+        <span class="l">/ ${fmt.money(b.budgetAmount)}</span>
+      </div>
+      <div class="bar stripe${over ? ' over' : ''}">
+        <i style="width:${(Math.min(result.progress, 1) * 100).toFixed(0)}%"></i>
+      </div>
       <div class="mini-stat">
-        <span class="${over ? 'amt-neg' : ''}">${fmt.percent(ratio)}${over ? ' · over' : ''}</span>
+        <span>${(result.progress * 100).toFixed(1)}%</span>
         <span>→ ${fmt.date(b.endDate)}</span>
       </div>
     </div>`;
       }).join('');
-      document.getElementById('budgetCards').innerHTML = cards ||
-        '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px">尚未建立任何預算</div>';
 
-      const rows = visible.map(b => {
-        const cat = lookupCategory(b.categoryId);
-        const catLabel = b.categoryId ? (cat ? `${cat.icon} ${cat.categoryName}` : b.categoryId) : '—';
-        const used = Number(b.usedAmount);
-        const over = used > Number(b.budgetAmount);
-        const sel = b.budgetId === state.editingBudgetId ? ' class="selected"' : '';
-        return `<tr${sel} data-budget-id="${b.budgetId}">
-      <td>${b.budgetScope}</td>
-      <td>${b.targetType}</td>
-      <td>${catLabel}</td>
+      const cardContainer = document.getElementById('budgetCards');
+      if (cardContainer) {
+        cardContainer.innerHTML = cards || '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px">尚未建立任何預算</div>';
+      }
+
+      // 2. 處理下方表格區 (Rows)
+      const rows = visible.map(result => {
+        const b = result.budget;
+        if (!b) return '';
+
+        // 按照你規劃的順序，移除所有關於 TOTAL 的判斷
+        return `
+    <tr onclick="loadBudgetToForm('${b.budgetId}')" style="cursor: pointer;">
+      <!-- 1. 預算名稱：顯示自定義名稱 -->
+      <td>${b.budgetScope || '未命名'}</td>
+      
+      <!-- 2. 分類名稱：直接顯示後端給的 categoryName -->
+      <td>${result.categoryName || '未設定'}</td>
+      
+      <!-- 3. 目前使用金額 -->
+      <td>${fmt.money(result.currentSpent)}</td>
+      
+      <!-- 4. 預算金額 -->
       <td>${fmt.money(b.budgetAmount)}</td>
-      <td class="${over ? 'amt-neg' : ''}">${fmt.money(used)}</td>
+      
+      <!-- 5. 使用百分比 -->
+      <td>${(result.progress * 100).toFixed(1)}%</td>
+      
+      <!-- 6. 開始時間 -->
       <td>${fmt.date(b.startDate)}</td>
+      
+      <!-- 7. 結束時間 -->
       <td>${fmt.date(b.endDate)}</td>
     </tr>`;
       }).join('');
-      document.getElementById('budgetTableBody').innerHTML = rows ||
-        '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">無預算</td></tr>';
+
+      const tableBody = document.getElementById('budgetTableBody');
+      if (tableBody) {
+        tableBody.innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">無預算</td></tr>';
+      }
 
       budgetsPager.renderInto('budgetsPager', renderBudgets);
     }
-
     /* ---------- populate selects ---------- */
     function populateAccountSelect() {
       document.getElementById('goalAccount').innerHTML = state.accounts
@@ -640,7 +668,11 @@
     }
     function populateBudgetCategorySelect() {
       const expenseCats = state.categories.filter(c => c.categoryType === 'EXPENSE');
-      document.getElementById('bdCategory').innerHTML = expenseCats
+
+      // 加上一個空白選項，避免使用者沒選就直接送出第一個
+      const defaultOption = '<option value="">-- 請選擇分類 --</option>';
+
+      document.getElementById('bdCategory').innerHTML = defaultOption + expenseCats
         .map(c => `<option value="${c.categoryId}">${c.icon || ''} ${c.categoryName}</option>`)
         .join('');
     }
@@ -713,21 +745,41 @@
 
     function enterGoalEditMode(g) {
       state.editingGoalId = g.savingGoalid;
-      document.getElementById('goalFormTitle').textContent = 'Edit: ' + g.goalName;
+      document.getElementById('goalFormTitle').textContent = '編輯目標: ' + g.goalName;
+
+      // --- 可編輯欄位 ---
       document.getElementById('goalName').value = g.goalName;
       document.getElementById('goalTarget').value = g.targetAmount;
-      document.getElementById('goalAccount').value = g.accountId;
-      document.getElementById('goalStart').value = g.startDate;
-      document.getElementById('goalEnd').value = g.endDate;
-      document.getElementById('goalSubmitBtn').textContent = 'Save changes';
+
+      // --- 鎖定欄位 (禁用與唯讀) ---
+      const accSel = document.getElementById('goalAccount');
+      accSel.value = g.accountId;
+      accSel.disabled = true; // 鎖定帳戶不可改
+
+      const startInput = document.getElementById('goalStart');
+      const endInput = document.getElementById('goalEnd');
+      startInput.value = g.startDate;
+      endInput.value = g.endDate;
+      startInput.readOnly = true; // 鎖定日期
+      endInput.readOnly = true;
+
+      // 按鈕切換
+      document.getElementById('goalSubmitBtn').textContent = '確認修改存款';
       document.getElementById('goalDeleteBtn').style.display = 'inline-flex';
-      renderGoals();   // 重繪讓 selected 高亮生效
+
+      renderGoals(); // 讓選中的卡片高亮
     }
 
     function resetGoalForm() {
       state.editingGoalId = null;
       document.getElementById('goalFormTitle').textContent = 'New goal';
       document.getElementById('goalForm').reset();
+
+      // --- 解鎖所有欄位 ---
+      document.getElementById('goalAccount').disabled = false;
+      document.getElementById('goalStart').readOnly = false;
+      document.getElementById('goalEnd').readOnly = false;
+
       document.getElementById('goalStart').value = fmt.today();
       document.getElementById('goalSubmitBtn').textContent = 'Save goal';
       document.getElementById('goalDeleteBtn').style.display = 'none';
@@ -798,31 +850,40 @@
 
     /* Delete */
     /* 當點擊原本表單裡的 🗑 刪除按鈕 */
-    document.getElementById('goalDeleteBtn').addEventListener('click', () => {
-      const modal = document.getElementById('deleteModal');
-      const select = document.getElementById('modalToAccountSelect');
+    document.getElementById('budgetDeleteBtn').addEventListener('click', async () => {
+      // 1. 邏輯檢查：確保知道現在要刪哪一筆
+      if (!state.editingBudgetId) return;
 
-      // 1. 邏輯過濾：排除掉「負債」帳戶
-      // 這裡假設你的帳戶資料中，代表類別的欄位叫 accountCategory
-      // 你需要根據你實際的 API 回傳值來修改 'LIABILITY' 這個字串
-      const nonDebtAccounts = state.accounts.filter(acc => {
-        // 只要類別「不等於」負債，就回傳 true (保留)
-        return acc.accountCategory !== 'LIABILITY' && acc.accountCategory !== 'CREDIT_CARD';
-      });
+      // 2. 找出這筆預算的資料（為了顯示名稱給使用者確認）
+      const result = state.budgets.find(x => String(x.budget.budgetId) === String(state.editingBudgetId));
+      if (!result) return;
 
-      // 2. 裝進下拉軸 (這次裝的是過濾後的清單)
-      select.innerHTML = nonDebtAccounts.map(acc =>
-        `<option value="${acc.accountId}">${acc.accountName} ($${acc.balance})</option>`
-      ).join('');
+      const b = result.budget;
+      const label = b.budgetScope || result.categoryName || "這筆預算";
 
-      modal.style.display = 'flex';
+      // 3. 使用者二次確認，避免手滑
+      if (!confirm(`確認刪除預算「${label}」? 此操作無法復原。`)) return;
+
+      try {
+        console.log("1. 開始刪除預算，ID:", state.editingBudgetId);
+
+        // 4. 呼叫後端 API (根據你 api.js 的定義，通常是 WalletPet.budgetApi.delete 或 remove)
+        // 注意：如果是你同學寫的，請確認是 .remove 還是 .delete
+        await WalletPet.budgetApi.remove(state.editingBudgetId);
+
+        alert("刪除成功！");
+
+        // 5. 關鍵同步：重置表單並刷新畫面
+        resetBudgetForm(); // 清空左側輸入框並隱藏刪除按鈕
+        await init();      // 叫大總管重新抓資料並畫出右側進度條
+
+        console.log("2. 刪除後刷新完畢！");
+
+      } catch (ex) {
+        console.error("刪除失敗：", ex);
+        alert("刪除失敗，請檢查後端服務是否正常。");
+      }
     });
-
-    /* 小視窗裡的「取消」 */
-    document.getElementById('modalCancelBtn').addEventListener('click', () => {
-      document.getElementById('deleteModal').style.display = 'none';
-    });
-
     /* 小視窗裡的「確認結清」：這才是真正的關鍵 */
     document.getElementById('modalConfirmBtn').addEventListener('click', async () => {
       const toAccountId = document.getElementById('modalToAccountSelect').value;
@@ -883,70 +944,84 @@
       }
     });
     /* Submit: create or update */
+    /* Submit: create or update */
     document.getElementById('goalForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const body = {
-        goalName: document.getElementById('goalName').value.trim(),
-        targetAmount: Number(document.getElementById('goalTarget').value),
-        accountId: Number(document.getElementById('goalAccount').value),
-        startDate: document.getElementById('goalStart').value,
-        endDate: document.getElementById('goalEnd').value,
-      };
 
-      if (state.editingGoalId) {
-        // UPDATE
-        try {
-          const updated = await WalletPet.savingGoalApi.update(state.editingGoalId, body);
-          const idx = state.goals.findIndex(x => x.savingGoalid === state.editingGoalId);
-          if (idx >= 0) state.goals[idx] = updated || { ...state.goals[idx], ...body };
-        } catch (ex) {
-          console.warn('[goals] 更新失敗, 本地模擬');
-          const idx = state.goals.findIndex(x => x.savingGoalid === state.editingGoalId);
-          if (idx >= 0) state.goals[idx] = { ...state.goals[idx], ...body };
+      try {
+        // 1. 取得目前輸入的數值 (補上這行取得 value)
+        const goalNameValue = document.getElementById('goalName').value;
+        const amount = Number(document.getElementById('goalTarget').value);
+
+        if (state.editingGoalId) {
+          // 【修改邏輯】
+          console.log("正在更新存款目標 ID:", state.editingGoalId);
+
+          const updateBody = {
+            goalName: goalNameValue, // 使用剛取得的字串值
+            targetAmount: amount
+          };
+
+          console.log("準備送出的資料：", updateBody); // 調試用
+
+          await WalletPet.savingGoalApi.update(state.editingGoalId, updateBody);
+          alert("修改成功");
+        } else {
+          // 【新增邏輯】
+          const body = {
+            goalName: goalNameValue,
+            targetAmount: amount,
+            accountId: document.getElementById('goalAccount').value,
+            startDate: document.getElementById('goalStart').value,
+            endDate: document.getElementById('goalEnd').value
+          };
+          await WalletPet.savingGoalApi.create(body);
+          alert("儲存成功");
         }
-      } else {
-        // CREATE
-        try {
-          const created = await WalletPet.savingGoalApi.create(body);
-          state.goals.push(created);
-        } catch (ex) {
-          console.warn('[goals] 新增失敗, 本地模擬');
-          state.goals.push({
-            savingGoalid: 'g_local_' + Date.now(),
-            saved_amount: 0,
-            ...body,
-          });
-        }
+
+        resetGoalForm();
+        await init();
+
+      } catch (ex) {
+        console.error("操作失敗：", ex);
+        // 建議這裡顯示具體的錯誤訊息，debug 比較快
+        alert("操作失敗：" + (ex.message || "請檢查資料格式"));
       }
-      resetGoalForm();
     });
 
 
     /* ========================================================
        Budget form: new / edit / delete
        ======================================================== */
-    function enterBudgetEditMode(b) {
+    function loadBudgetToForm(budgetId) {
+      const result = state.budgets.find(x => String(x.budget.budgetId) === String(budgetId));
+      if (!result) return;
+
+      const b = result.budget;
       state.editingBudgetId = b.budgetId;
-      const cat = lookupCategory(b.categoryId);
-      const label = b.targetType === 'TOTAL' ? '🛒 TOTAL'
-        : (cat ? `${cat.icon} ${cat.categoryName}` : b.categoryId);
-      document.getElementById('budgetFormTitle').textContent = 'Edit: ' + label;
-      document.getElementById('bdScope').value = b.budgetScope;
-      document.getElementById('bdTarget').value = b.targetType;
+
+      document.getElementById('budgetFormTitle').textContent = '編輯預算: ' + b.budgetScope;
+
+      // --- 可編輯欄位 ---
+      document.getElementById('bdScope').value = b.budgetScope; // 名稱
+      document.getElementById('bdAmount').value = b.budgetAmount; // 金額
+
+      // --- 鎖定欄位 (禁用掉，不讓使用者改) ---
       const catSel = document.getElementById('bdCategory');
-      if (b.targetType === 'TOTAL') {
-        catSel.disabled = true;
-        catSel.required = false;
-      } else {
-        catSel.disabled = false;
-        catSel.required = true;
-        catSel.value = b.categoryId || '';
-      }
-      document.getElementById('bdAmount').value = b.budgetAmount;
-      document.getElementById('bdStart').value = b.startDate;
-      document.getElementById('bdEnd').value = b.endDate;
-      document.getElementById('budgetSubmitBtn').textContent = 'Save changes';
+      catSel.value = b.categoryId || '';
+      catSel.disabled = true; // 鎖死分類
+
+      const startInput = document.getElementById('bdStart');
+      const endInput = document.getElementById('bdEnd');
+      startInput.value = b.startDate;
+      endInput.value = b.endDate;
+      startInput.readOnly = true; // 鎖死日期
+      endInput.readOnly = true;
+
+      // 按鈕切換
+      document.getElementById('budgetSubmitBtn').textContent = '確認修改';
       document.getElementById('budgetDeleteBtn').style.display = 'inline-flex';
+
       renderBudgets();
     }
 
@@ -954,14 +1029,16 @@
       state.editingBudgetId = null;
       document.getElementById('budgetFormTitle').textContent = 'New budget';
       document.getElementById('budgetForm').reset();
+
+      // --- 解鎖欄位 ---
+      document.getElementById('bdCategory').disabled = false; // 恢復可選
+      document.getElementById('bdStart').readOnly = false;    // 恢復可填[cite: 1]
+      document.getElementById('bdEnd').readOnly = false;
+
       document.getElementById('bdStart').value = fmt.today();
-      // 重設 category 的 disabled 狀態
-      const bdTarget = document.getElementById('bdTarget');
-      const catSel = document.getElementById('bdCategory');
-      catSel.disabled = bdTarget.value === 'TOTAL';
-      catSel.required = bdTarget.value !== 'TOTAL';
       document.getElementById('budgetSubmitBtn').textContent = 'Save budget';
       document.getElementById('budgetDeleteBtn').style.display = 'none';
+
       renderBudgets();
     }
 
@@ -970,13 +1047,13 @@
       const card = e.target.closest('[data-budget-id]');
       if (!card) return;
       const b = state.budgets.find(x => String(x.budgetId) === card.dataset.budgetId);
-      if (b) enterBudgetEditMode(b);
+      if (b) loadBudgetToForm(budgetId);
     });
     document.getElementById('budgetTableBody').addEventListener('click', e => {
       const tr = e.target.closest('tr[data-budget-id]');
       if (!tr) return;
       const b = state.budgets.find(x => String(x.budgetId) === tr.dataset.budgetId);
-      if (b) enterBudgetEditMode(b);
+      if (b) loadBudgetToForm(budgetId);
     });
 
     /* Cancel */
@@ -1002,80 +1079,69 @@
     /* Submit: create or update */
     document.getElementById('budgetForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const scope = document.getElementById('bdScope').value;
-      const target = document.getElementById('bdTarget').value;
-      const categoryId = target === 'TOTAL' ? null : document.getElementById('bdCategory').value;
-      const body = {
-        budgetScope: scope,
-        targetType: target,
-        categoryId: categoryId,
-        budgetAmount: Number(document.getElementById('bdAmount').value),
-        startDate: document.getElementById('bdStart').value,
-        endDate: document.getElementById('bdEnd').value,
-      };
 
-      if (state.editingBudgetId) {
-        // UPDATE
-        try {
-          const updated = await WalletPet.budgetApi.update(state.editingBudgetId, body);
-          const idx = state.budgets.findIndex(x => x.budgetId === state.editingBudgetId);
-          if (idx >= 0) state.budgets[idx] = updated || { ...state.budgets[idx], ...body };
-        } catch (ex) {
-          console.warn('[budgets] 更新失敗, 本地模擬');
-          const idx = state.budgets.findIndex(x => x.budgetId === state.editingBudgetId);
-          if (idx >= 0) state.budgets[idx] = { ...state.budgets[idx], ...body };
+      try {
+        const body = {
+          budgetScope: document.getElementById('bdScope').value,
+          budgetAmount: Number(document.getElementById('bdAmount').value),
+          // 雖然鎖定了，但送出時還是要把這些值帶上，或者後端 update 邏輯會只更新特定欄位
+          tempCategoryId: document.getElementById('bdCategory').value,
+          startDate: document.getElementById('bdStart').value,
+          endDate: document.getElementById('bdEnd').value,
+          targetType: 'EXPENSE'
+        };
+
+        if (state.editingBudgetId) {
+          // 【修改邏輯】
+          console.log("正在更新預算 ID:", state.editingBudgetId);
+
+          // 關鍵修正：不要傳 body 物件，直接傳金額數字進去
+          const amountOnly = Number(document.getElementById('bdAmount').value);
+          await WalletPet.budgetApi.update(state.editingBudgetId, amountOnly);
+
+          alert("修改成功");
+        } else {
+          // ... 新增邏輯維持不變，因為 create 需要完整的 body ...
+          await WalletPet.budgetApi.create(body);
+          alert("儲存成功");
         }
-      } else {
-        // CREATE
-        try {
-          const created = await WalletPet.budgetApi.create(body);
-          state.budgets.push(created);
-        } catch (ex) {
-          console.warn('[budgets] 新增失敗, 本地模擬');
-          state.budgets.push({
-            budgetId: 'b_local_' + Date.now(),
-            usedAmount: 0,
-            ...body,
-          });
-        }
+
+        resetBudgetForm();
+        await init(); // 刷新右邊區域[cite: 1]
+
+      } catch (ex) {
+        console.error("操作失敗：", ex);
+        alert("操作失敗，請檢查資料格式");
       }
-      resetBudgetForm();
-    });
-
-    /* ---------- targetType 切換時,control categoryId 是否 required ---------- */
-    document.getElementById('bdTarget').addEventListener('change', e => {
-      const catSel = document.getElementById('bdCategory');
-      catSel.disabled = e.target.value === 'TOTAL';
-      catSel.required = e.target.value !== 'TOTAL';
     });
 
     /* ---------- init ---------- */
     async function loadSavingAccountsOnly() {
-  try {
-    const response = await WalletPet.savingGoalApi.getSavingAccounts();
-    console.log("後端回傳的原始資料：", response);
+      try {
+        const response = await WalletPet.savingGoalApi.getSavingAccounts();
+        console.log("後端回傳的原始資料：", response);
 
-    // 關鍵修正：直接使用 response，不再點 .data
-    const savingAccounts = response; 
+        // 關鍵修正：直接使用 response，不再點 .data
+        const savingAccounts = response;
 
-    const select = document.getElementById('goalAccount');
-    if (!select) return;
+        const select = document.getElementById('goalAccount');
+        if (!select) return;
 
-    // 清空並重新填充
-    let options = '<option value="" disabled selected>請選擇存款帳戶</option>';
+        // 清空並重新填充
+        let options = '<option value="" disabled selected>請選擇存款帳戶</option>';
 
-    options += savingAccounts.map(a =>
-      `<option value="${a.accountId}">#${a.accountId} ${a.accountName} (餘額: ${a.balance})</option>`
-    ).join('');
+        options += savingAccounts.map(a =>
+          `<option value="${a.accountId}">#${a.accountId} ${a.accountName} (餘額: ${a.balance})</option>`
+        ).join('');
 
-    // 加入新增按鈕
-    options += `<option value="NEW_ACCOUNT_TRIGGER" style="color: #e8643a; font-weight: bold; background: #fff5f2;">+ 新增存款帳戶...</option>`;
+        // 加入新增按鈕
+        options += `<option value="NEW_ACCOUNT_TRIGGER" style="color: #e8643a; font-weight: bold; background: #fff5f2;">+ 新增存款帳戶...</option>`;
 
-    select.innerHTML = options;
-  } catch (ex) {
-    console.error("載入存款帳戶失敗", ex);
-  }
-}
+        select.innerHTML = options;
+      } catch (ex) {
+        console.error("載入存款帳戶失敗", ex);
+      }
+    }
     /* ---------- 全份 init 函式 (無省略) ---------- */
     async function init() {
       console.log("1. init 函式開始執行");
@@ -1088,19 +1154,37 @@
       if (bdStartInput) bdStartInput.value = today;
 
       try {
-        // 抓取各項資料
-        try { state.accounts = await WalletPet.accountApi.list(); } catch { state.accounts = demoAccounts; }
-        try { state.categories = await WalletPet.categoryApi.list(); } catch { state.categories = demoCategories; }
-        try { state.goals = await WalletPet.savingGoalApi.list(); } catch { state.goals = demoGoals; }
-        try { state.budgets = await WalletPet.budgetApi.list(); } catch { state.budgets = demoBudgets; }
+        // --- 抓取各項資料 (僅在分類這邊加上 .data 判斷，確保抓到真正的陣列) ---
+        try {
+          const resAcc = await WalletPet.accountApi.list();
+          state.accounts = resAcc.data || resAcc;
+        } catch { state.accounts = demoAccounts; }
 
-        // 執行填充與渲染
+        try {
+          const resCat = await WalletPet.categoryApi.list();
+          // 關鍵點：有些後端會包在 .data 裡，有些直接給陣列，這樣寫最保險
+          state.categories = resCat.data || resCat;
+        } catch { state.categories = demoCategories; }
+
+        try {
+          const resGoal = await WalletPet.savingGoalApi.list();
+          state.goals = resGoal.data || resGoal;
+        } catch { state.goals = demoGoals; }
+
+        try {
+          const resBud = await WalletPet.budgetApi.list();
+          state.budgets = resBud.data || resBud;
+        } catch { state.budgets = demoBudgets; }
+
+        // --- 執行填充與渲染 (這部分維持你的原始順序) ---
         populateAccountSelect();
 
         console.log("2. 準備執行 loadSavingAccountsOnly");
+        // 這裡是你之前修很久的地方，絕對不動它
         await loadSavingAccountsOnly();
         console.log("3. loadSavingAccountsOnly 執行完畢");
 
+        // 更新預算的分類選單與渲染
         populateBudgetCategorySelect();
         renderGoals();
         renderBudgets();

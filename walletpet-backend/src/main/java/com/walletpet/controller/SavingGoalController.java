@@ -76,4 +76,16 @@ public class SavingGoalController {
 		List<SavingGoal> data = savingGoalService.findAll(userId);
 		return ApiResponse.success("查詢成功", data);
 	}
+	
+	/**
+	 * 6. 修改目標 (名稱與金額) 
+	 * PUT /api/saving-goals/{id}
+	 */
+	@PutMapping("/{id}")
+	public ApiResponse<SavingGoal> updateGoal(@PathVariable String id, @RequestBody SavingGoalRequest request) {
+	    String userId = currentUserUtil.getCurrentUserId();
+	    // 呼叫你剛發現的那個 Service 方法
+	    SavingGoal data = savingGoalService.updateGoal(userId, id, request);
+	    return ApiResponse.success("目標修改成功", data);
+	}
 }

@@ -15,16 +15,20 @@ import lombok.EqualsAndHashCode;
 
 
 @Entity
-@Table(name = "savinggoal")
+@Table(name = "saving_goals")
 @EqualsAndHashCode(exclude = {"user", "account"}) 
 @Data
 public class SavingGoal {
 	@Id
+	@Column(name="saving_goal_id")
 	private String savingGoalid;
-	@Column(name = "goalName", length = 100)
+	@Column(name = "goal_name", length = 100)
 	private String goalName;
+	@Column(name="target_amount")
 	private BigDecimal targetAmount;
+	@Column(name="start_date")
 	private LocalDate startDate;
+	@Column(name="end_date")
 	private LocalDate endDate;
 	
 	@JsonIgnore

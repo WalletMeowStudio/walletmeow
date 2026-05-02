@@ -330,29 +330,35 @@ function renderCashflow(points) {
 }
 
 async function loadDashboard() {
-  // 規格 4.5 Chart 模組:summary / cashflow-line 皆要求 startDate / endDate
-  // 預設取本月 1 日 ~ 今天
   const today = new Date();
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const pad = n => String(n).padStart(2, '0');
   const toIso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const range = { startDate: toIso(monthStart), endDate: toIso(today) };
+
+  const range = {
+    startDate: toIso(monthStart),
+    endDate: toIso(today),
+  };
 
   try {
-    const s = await WalletPet.chartApi.summary(range);
-    renderSummary(s);
+    const [summary, txPage, pet, events] = await Promise.all([
+      WalletPet.transactionApi.summary(range),
+      WalletPet.transactionApi.list({ ...range, page: 0, size: 6 }),
+      WalletPet.petApi.me(),
+      WalletPet.petEventApi.list({ page: 0, size: 5 }),
+    ]);
+
+    WalletPet.updatePetStatus(pet);
+
+    const adapted = adaptTransactionSummary(summary, txPage.items || []);
+    renderSummary(adapted);
+
   } catch (e) {
     console.warn('[dashboard] 使用 demo 資料 (' + e.message + ')');
     renderSummary(demoSummary);
   }
-  try {
-    const cf = await WalletPet.chartApi.cashflowLine({ ...range, groupBy: 'DAY' });
-    // 規格回傳 [{ label, income, expense, balance }, ...],取 balance 當趨勢點
-    const points = Array.isArray(cf) ? cf.map(p => p.balance) : (cf && cf.points);
-    renderCashflow(points);
-  } catch {
-    renderCashflow();
-  }
+
+  renderCashflow();
 }
 
 loadDashboard();

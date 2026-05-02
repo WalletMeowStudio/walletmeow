@@ -282,27 +282,28 @@ const fmt = WalletPet.format;
 
 /* event_type 與後端 PetServiceImpl 常數對齊;reward 欄位用於展示用提示文字 */
 const EVENT_META = {
-  /* cancan 系統 */
-  FEED_CAN:     { icon: '🥫', label: '餵罐罐' },
-  FEED_FISH:    { icon: '🐟', label: '餵小魚乾' },
-  FEED_SNACK:   { icon: '🍪', label: '餵零食' },
-  FEED_FEAST:   { icon: '🍽', label: '大餐' },
-  BOOKKEEPING:  { icon: '📝', label: '記帳獎勵' },
-  LOGIN_STREAK: { icon: '🔥', label: '連續登入' },
-  LOGIN_MISS:   { icon: '💤', label: '缺席扣血' },
-  /* legacy 互動類型,後端 v1.0 仍接受 */
-  PET:          { icon: '🧶', label: '擼擼' },
-  MUSIC:        { icon: '🎵', label: '播音樂' },
-  ACHIEVEMENT:  { icon: '🎉', label: '成就' },
-  CHAT:         { icon: '💬', label: '對話' },
+  PET_FEED_CAN: { icon: '🥫', label: '餵食罐罐' },
+  PET_FEED_FISH: { icon: '🐟', label: '餵食魚' },
+  PET_FEED_SNACK: { icon: '🍪', label: '餵食點心' },
+  PET_FEED_FEAST: { icon: '🍱', label: '餵食大餐' },
+
+  DAILY_BOOKKEEPING_REWARD: { icon: '🥫', label: '記帳獎勵' },
+
+  LOGIN_STREAK_3: { icon: '🔥', label: '連續登入 3 天' },
+  LOGIN_STREAK_7: { icon: '🌟', label: '連續登入 7 天' },
+  LOGIN_ABSENCE_3: { icon: '💧', label: '缺席 3 天' },
+  LOGIN_ABSENCE_7: { icon: '🌧', label: '缺席 7 天' },
+  MOOD_RECOVERY_60: { icon: '💚', label: '心情恢復' },
+
+  ADMIN_MOOD_ADJUST: { icon: '🛠', label: '管理員調整' },
 };
 
 /* feed 按鈕 → 對應 PetEvent 的事件型別 + 預期 delta(後端會做最終裁切) */
 const FEED_TO_EVENT = {
-  CAN:   { eventType: 'FEED_CAN',   moodDelta: 1,  cancanDelta: -1 },
-  FISH:  { eventType: 'FEED_FISH',  moodDelta: 1,  cancanDelta: -1 },
-  SNACK: { eventType: 'FEED_SNACK', moodDelta: 1,  cancanDelta: -1 },
-  FEAST: { eventType: 'FEED_FEAST', moodDelta: 15, cancanDelta: -10 },
+  CAN:   { eventType: 'PET_FEED_CAN',   moodDelta: 1,  cancanDelta: -1 },
+  FISH:  { eventType: 'PET_FEED_FISH',  moodDelta: 1,  cancanDelta: -1 },
+  SNACK: { eventType: 'PET_FEED_SNACK', moodDelta: 1,  cancanDelta: -1 },
+  FEAST: { eventType: 'PET_FEED_FEAST', moodDelta: 15, cancanDelta: -10 },
 };
 
 const demoPet = {
@@ -337,16 +338,16 @@ function genDemoEvents() {
   // 以 offset(=幾天前)定義事件,而非寫死月份的某一天
   // offset 0~6 是手機近 7 天視窗,9/12/15 給桌機看更早的歷史
   const offsetSets = [
-    { offset: 0, types: ['FEED_CAN', 'BOOKKEEPING', 'BOOKKEEPING'] },
-    { offset: 1, types: ['FEED_FISH', 'BOOKKEEPING'] },
-    { offset: 2, types: ['FEED_CAN', 'FEED_SNACK', 'BOOKKEEPING'] },
-    { offset: 3, types: ['BOOKKEEPING', 'BOOKKEEPING'] },
-    { offset: 4, types: ['FEED_FEAST', 'BOOKKEEPING'] },
-    { offset: 5, types: ['FEED_CAN', 'BOOKKEEPING'] },
-    { offset: 6, types: ['FEED_SNACK', 'BOOKKEEPING'] },
-    { offset: 9,  types: ['FEED_FEAST', 'BOOKKEEPING'] },
-    { offset: 12, types: ['FEED_FISH', 'FEED_CAN', 'BOOKKEEPING'] },
-    { offset: 15, types: ['BOOKKEEPING', 'FEED_CAN'] },
+    { offset: 0, types: ['PET_FEED_CAN', 'DAILY_BOOKKEEPING_REWARD', 'DAILY_BOOKKEEPING_REWARD'] },
+    { offset: 1, types: ['PET_FEED_FISH', 'DAILY_BOOKKEEPING_REWARD'] },
+    { offset: 2, types: ['PET_FEED_CAN', 'PET_FEED_SNACK', 'DAILY_BOOKKEEPING_REWARD'] },
+    { offset: 3, types: ['DAILY_BOOKKEEPING_REWARD', 'DAILY_BOOKKEEPING_REWARD'] },
+    { offset: 4, types: ['PET_FEED_FEAST', 'DAILY_BOOKKEEPING_REWARD'] },
+    { offset: 5, types: ['PET_FEED_CAN', 'DAILY_BOOKKEEPING_REWARD'] },
+    { offset: 6, types: ['PET_FEED_SNACK', 'DAILY_BOOKKEEPING_REWARD'] },
+    { offset: 9,  types: ['PET_FEED_FEAST', 'DAILY_BOOKKEEPING_REWARD'] },
+    { offset: 12, types: ['PET_FEED_FISH', 'PET_FEED_CAN', 'DAILY_BOOKKEEPING_REWARD'] },
+    { offset: 15, types: ['DAILY_BOOKKEEPING_REWARD', 'PET_FEED_CAN'] },
   ];
   const base = [];
   let idCounter = 1000;
@@ -610,10 +611,18 @@ async function loadPet() {
 }
 
 async function loadEvents() {
-  // 規格 4.5 Pet 模組沒定義「列出事件」端點;暫時用 demo 事件,
-  // 後續若要真資料,需與後端討論補 GET /api/pet-events 或在 interact / reward 回應中帶最新事件
-  console.warn('[pets] 規格未定義 pet-events 端點,使用 demo events');
-  state.events = genDemoEvents();
+  try {
+    const data = await WalletPet.petEventApi.list({
+      page: 0,
+      size: 100,
+    });
+
+    state.events = data.items || [];
+  } catch (e) {
+    console.warn('[pets] pet events 載入失敗', e);
+    state.events = [];
+  }
+
   renderMoodMonth();
   renderEvents();
 }
@@ -636,11 +645,7 @@ document.querySelectorAll('[data-feed]').forEach(btn => {
     }
 
     try {
-      const result = await WalletPet.petApi.feed({
-        userId: state.pet?.userId || 'demo',
-        petId : state.pet?.petId  || 'p_default',
-        feedType,
-      });
+      const result = await WalletPet.petApi.feed(feedType);
       if (result && typeof result.mood === 'number') {
         state.pet = result;
         renderPet(result);
