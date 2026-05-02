@@ -2,6 +2,7 @@ package com.walletpet.controller;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -51,13 +52,22 @@ public class BudgetController {
      * 建立預算
      */
     @PostMapping
-    public ApiResponse<Budget> createBudget(@RequestBody Budget budget) {
-        // 1. 科學的第一步：從 Token 抓出「到底是誰」在發請求
+    public ApiResponse<Budget> createBudget(@RequestBody Map<String, Object> payload) {
         String currentUserId = currentUserUtil.getCurrentUserId();
         
-        // 2. 科學的第二步：把預算物件「連同用戶 ID」一起交給 Service
-        // 不要讓前端傳 User 物件，由我們後端來綁定
-        Budget savedBudget = budgetService.createBudget(currentUserId, budget);
+        // 1. 手動把 Map 轉成 Budget 物件 (這不會理會 JsonIgnore)
+        Budget budget = new Budget();
+        budget.setBudgetScope((String) payload.get("budgetScope"));
+        budget.setTargetType((String) payload.get("targetType"));
+        budget.setBudgetAmount(new java.math.BigDecimal(payload.get("budgetAmount").toString()));
+        budget.setStartDate(java.time.LocalDate.parse((String) payload.get("startDate")));
+        budget.setEndDate(java.time.LocalDate.parse((String) payload.get("endDate")));
+
+        // 2. 關鍵：從 JSON 裡直接抓出那個「進不去的 ID」
+        String categoryId = (String) payload.get("tempCategoryId");
+        
+        // 3. 把這個 ID 交給 Service 處理
+        Budget savedBudget = budgetService.createBudgetWithId(currentUserId, budget, categoryId);
         
         return ApiResponse.success("建立預算成功", savedBudget);
     }

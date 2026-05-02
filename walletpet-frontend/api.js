@@ -94,7 +94,7 @@
   WalletPet.savingGoalApi = {
     list   : ()      => api.get('/api/saving-goals'),
     create : (body)  => api.post('/api/saving-goals', body),
-    update : (id, b) => api.put(`/api/saving-goals/${id}`, b),
+    update: (id, b) => api.put(`/api/saving-goals/${id}`, b),
     remove : (id, toAccountId) => api.del(`/api/saving-goals/${id}?toAccountId=${toAccountId}`),
     deposit: (id, amount, fromAccountId) => 
   api.post(`/api/saving-goals/${id}/deposit?amount=${amount}&fromAccountId=${fromAccountId}`),
