@@ -15,6 +15,7 @@ import com.walletpet.entity.Category;
 import com.walletpet.entity.User;
 import com.walletpet.repository.BudgetRepository;
 import com.walletpet.repository.CategoryRepository;
+
 import com.walletpet.service.BudgetService;
 import com.walletpet.service.TransactionService;
 import com.walletpet.service.UserService;
@@ -51,9 +52,11 @@ public class BudgetServiceImpl implements BudgetService {
         List<Budget> budgets = budgetRepository.findByUser(user);
 
         return budgets.stream().map(budget -> {
+
             // 2. 獲取該預算的支出總額
             // 注意：如果是整體預算，categoryId 可能為 null
             String categoryId = (budget.getCategory() != null) ? budget.getCategory().getCategoryId() : null;
+
 
             Map<String, Object> summary = transactionService.getSummary(
                     userId,
@@ -155,6 +158,7 @@ public class BudgetServiceImpl implements BudgetService {
 
         return new BigDecimal(value.toString());
     }
+
     public Budget createBudgetWithId(String userId, Budget budget, String categoryId) {
         // 1. 設置用戶
         User user = userService.getUserEntityById(userId); 
@@ -174,4 +178,5 @@ public class BudgetServiceImpl implements BudgetService {
 
         return budgetRepository.save(budget);
     }
+
 }
