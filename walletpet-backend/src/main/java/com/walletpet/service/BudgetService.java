@@ -13,4 +13,5 @@ public interface BudgetService {
 	 public void deleteBudget(String budgetId);
 	 public Budget getBudgetById(String budgetId);
 	 public Budget createBudget(String userId, Budget budget);
+	 public Budget createBudgetWithId(String userId, Budget budget, String categoryId);
 }

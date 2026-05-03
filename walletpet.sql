@@ -72,7 +72,7 @@ CREATE TABLE `accounts` (
   KEY `idx_accounts_user_id` (`user_id`),
   KEY `idx_accounts_is_saving_account` (`is_saving_account`),
   CONSTRAINT `fk_accounts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -81,7 +81,7 @@ CREATE TABLE `accounts` (
 
 LOCK TABLES `accounts` WRITE;
 /*!40000 ALTER TABLE `accounts` DISABLE KEYS */;
-INSERT INTO `accounts` VALUES (1,'default','測試現金帳戶',12700.00,0,0,0,'2026-04-25 15:35:53');
+INSERT INTO `accounts` VALUES (1,'default','測試現金帳戶',12700.00,0,0,0,'2026-04-25 15:35:53'),(2,'99de80f9-8cc6-45a3-9586-013a91b312cf','現金',19900.00,0,0,0,'2026-04-30 21:01:16'),(3,'99de80f9-8cc6-45a3-9586-013a91b312cf','銀行',263500.00,0,0,0,'2026-04-30 21:01:16'),(4,'99de80f9-8cc6-45a3-9586-013a91b312cf','信用卡',-900.00,1,0,0,'2026-04-30 21:01:16');
 /*!40000 ALTER TABLE `accounts` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -150,11 +150,7 @@ CREATE TABLE `categories` (
 
 LOCK TABLES `categories` WRITE;
 /*!40000 ALTER TABLE `categories` DISABLE KEYS */;
-<<<<<<< HEAD
-INSERT INTO `categories` VALUES ('ES001','default','飲食','EXPENSE','wait','#FF9F43',1,'2026-04-16 11:53:24',0),('ES002','default','娛樂','EXPENSE','wait','#A29BFE',1,'2026-04-16 11:53:24',0),('IS001','default','薪水','INCOME','wait','#2ECC71',1,'2026-04-16 11:53:24',0),('IS002','default','投資','INCOME','wait','#3498DB',1,'2026-04-16 11:53:24',0);
-=======
-INSERT INTO `categories` VALUES ('CAT202604251443398cdfe68f','default','咖啡飲料','EXPENSE','coffee','#6D4C41',0,'2026-04-25 14:43:39',0),('ES001','default','飲食','EXPENSE','wait','#FF9F43',1,'2026-04-16 11:53:24',0),('ES002','default','娛樂','EXPENSE','wait','#A29BFE',1,'2026-04-16 11:53:24',0),('IS001','default','薪水','INCOME','wait','#2ECC71',1,'2026-04-16 11:53:24',0),('IS002','default','投資','INCOME','wait','#3498DB',1,'2026-04-16 11:53:24',0);
->>>>>>> tzuchen
+INSERT INTO `categories` VALUES ('CAT202604251443398cdfe68f','default','咖啡飲料','EXPENSE','coffee','#6D4C41',0,'2026-04-25 14:43:39',0),('CAT202604302053217a593f5a','default','獎金','INCOME','?','#FDCB6E',0,'2026-04-30 20:53:21',0),('CAT20260430210116368f95d1','99de80f9-8cc6-45a3-9586-013a91b312cf','薪資','INCOME','salary','#4CAF50',1,'2026-04-30 21:01:16',0),('CAT202604302101163f0ec07e','99de80f9-8cc6-45a3-9586-013a91b312cf','購物','EXPENSE','shopping','#E91E63',1,'2026-04-30 21:01:16',0),('CAT202604302101164546413c','99de80f9-8cc6-45a3-9586-013a91b312cf','醫療','EXPENSE','medical','#F44336',1,'2026-04-30 21:01:16',0),('CAT2026043021011646f4a92f','99de80f9-8cc6-45a3-9586-013a91b312cf','投資','INCOME','investment','#009688',1,'2026-04-30 21:01:16',0),('CAT202604302101165f4a5ca6','99de80f9-8cc6-45a3-9586-013a91b312cf','獎金','INCOME','bonus','#8BC34A',1,'2026-04-30 21:01:16',0),('CAT202604302101168d89fdbe','99de80f9-8cc6-45a3-9586-013a91b312cf','生活用品','EXPENSE','daily','#795548',1,'2026-04-30 21:01:16',0),('CAT202604302101169771990d','99de80f9-8cc6-45a3-9586-013a91b312cf','娛樂','EXPENSE','entertainment','#9C27B0',1,'2026-04-30 21:01:16',0),('CAT202604302101169ea8ef5b','99de80f9-8cc6-45a3-9586-013a91b312cf','餐飲','EXPENSE','food','#FF9800',1,'2026-04-30 21:01:16',0),('CAT20260430210116aff08c80','99de80f9-8cc6-45a3-9586-013a91b312cf','交通','EXPENSE','transport','#03A9F4',1,'2026-04-30 21:01:16',0),('CAT20260430210116b4919b4c','99de80f9-8cc6-45a3-9586-013a91b312cf','其他收入','INCOME','income-other','#607D8B',1,'2026-04-30 21:01:16',0),('CAT20260430210116c49fc745','99de80f9-8cc6-45a3-9586-013a91b312cf','其他支出','EXPENSE','expense-other','#9E9E9E',1,'2026-04-30 21:01:16',0),('CAT20260430210116e1c42427','99de80f9-8cc6-45a3-9586-013a91b312cf','學習','EXPENSE','education','#3F51B5',1,'2026-04-30 21:01:16',0),('ES001','default','飲食','EXPENSE','wait','#FF9F43',1,'2026-04-16 11:53:24',0),('ES002','default','娛樂','EXPENSE','wait','#A29BFE',1,'2026-04-16 11:53:24',0),('IS001','default','薪水','INCOME','wait','#2ECC71',1,'2026-04-16 11:53:24',0),('IS002','default','投資','INCOME','wait','#3498DB',1,'2026-04-16 11:53:24',0);
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -175,25 +171,16 @@ CREATE TABLE `daily_record_rewards` (
   `reward_type` varchar(50) DEFAULT NULL,
   `reward_value` int DEFAULT NULL,
   `mood_delta` int NOT NULL DEFAULT '0',
-<<<<<<< HEAD
   `cancan_delta` int NOT NULL DEFAULT '0',
   `claimed_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-=======
-  `claimed_at` datetime DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
->>>>>>> tzuchen
   PRIMARY KEY (`daily_reward_id`),
   UNIQUE KEY `uk_daily_reward_user_date` (`user_id`,`reward_date`),
   KEY `idx_daily_reward_user_id` (`user_id`),
   KEY `idx_daily_reward_reward_date` (`reward_date`),
   CONSTRAINT `fk_daily_reward_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
-<<<<<<< HEAD
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-=======
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
->>>>>>> tzuchen
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -202,10 +189,7 @@ CREATE TABLE `daily_record_rewards` (
 
 LOCK TABLES `daily_record_rewards` WRITE;
 /*!40000 ALTER TABLE `daily_record_rewards` DISABLE KEYS */;
-<<<<<<< HEAD
-=======
-INSERT INTO `daily_record_rewards` VALUES (1,'default','2026-04-25',1,2,1,'MOOD_BONUS',5,5,'2026-04-25 16:13:03','2026-04-25 16:13:03','2026-04-25 16:13:03');
->>>>>>> tzuchen
+INSERT INTO `daily_record_rewards` VALUES (1,'default','2026-04-25',1,2,1,'MOOD_BONUS',5,5,1,'2026-04-25 16:13:03','2026-04-25 16:13:03','2026-04-25 16:13:03'),(2,'99de80f9-8cc6-45a3-9586-013a91b312cf','2026-04-30',1,9,1,'CAT_FOOD',5,0,5,'2026-04-30 21:42:14','2026-04-30 21:04:13','2026-05-01 04:38:24'),(3,'99de80f9-8cc6-45a3-9586-013a91b312cf','2026-04-12',1,2,1,'CAT_FOOD',2,0,2,'2026-04-30 21:10:04','2026-04-30 21:09:29','2026-04-30 21:10:03'),(4,'99de80f9-8cc6-45a3-9586-013a91b312cf','2026-04-05',1,1,1,'CAT_FOOD',1,0,1,'2026-04-30 21:39:59','2026-04-30 21:39:59','2026-04-30 21:39:59'),(5,'99de80f9-8cc6-45a3-9586-013a91b312cf','2026-05-01',1,5,1,'CAT_FOOD',5,0,5,'2026-05-01 06:23:38','2026-05-01 03:59:09','2026-05-01 06:23:37');
 /*!40000 ALTER TABLE `daily_record_rewards` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -222,10 +206,7 @@ CREATE TABLE `pet_events` (
   `pet_id` varchar(50) NOT NULL,
   `event_type` varchar(50) NOT NULL,
   `mood_delta` int DEFAULT NULL,
-<<<<<<< HEAD
   `cancan_delta` int NOT NULL DEFAULT '0',
-=======
->>>>>>> tzuchen
   `reward` varchar(50) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`pet_event_id`),
@@ -233,7 +214,7 @@ CREATE TABLE `pet_events` (
   KEY `idx_pet_events_pet_id` (`pet_id`),
   CONSTRAINT `fk_pet_events_pet` FOREIGN KEY (`pet_id`) REFERENCES `pets` (`pet_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_pet_events_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -242,6 +223,7 @@ CREATE TABLE `pet_events` (
 
 LOCK TABLES `pet_events` WRITE;
 /*!40000 ALTER TABLE `pet_events` DISABLE KEYS */;
+INSERT INTO `pet_events` VALUES (1,'99de80f9-8cc6-45a3-9586-013a91b312cf','PET20260430210116e73e578d','DAILY_BOOKKEEPING_REWARD',0,1,'每日記帳獎勵：食物量 cancan +1','2026-04-30 21:04:13');
 /*!40000 ALTER TABLE `pet_events` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -257,7 +239,7 @@ CREATE TABLE `pet_model` (
   `rive_name` varchar(45) NOT NULL,
   `description` varchar(225) NOT NULL,
   PRIMARY KEY (`petmodel_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -266,6 +248,7 @@ CREATE TABLE `pet_model` (
 
 LOCK TABLES `pet_model` WRITE;
 /*!40000 ALTER TABLE `pet_model` DISABLE KEYS */;
+INSERT INTO `pet_model` VALUES (1,'default_cat','預設貓咪模型');
 /*!40000 ALTER TABLE `pet_model` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -300,6 +283,7 @@ CREATE TABLE `pets` (
 
 LOCK TABLES `pets` WRITE;
 /*!40000 ALTER TABLE `pets` DISABLE KEYS */;
+INSERT INTO `pets` VALUES ('PET20260430210116e73e578d','99de80f9-8cc6-45a3-9586-013a91b312cf','orange',78,0,'2026-05-01 06:23:53',1,'2026-04-30 21:01:16',1);
 /*!40000 ALTER TABLE `pets` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -430,7 +414,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES ('default','system','0000','2026-04-13 00:00:00','USER');
+INSERT INTO `users` VALUES ('99de80f9-8cc6-45a3-9586-013a91b312cf','test','1234','2026-04-30 21:01:16','USER'),('admin123','admin','0000','2026-05-03 15:46:12','ADMIN'),('default','system','0000','2026-04-13 00:00:00','USER');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -443,8 +427,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
-<<<<<<< HEAD
--- Dump completed on 2026-04-24 14:56:32
-=======
--- Dump completed on 2026-04-25 21:21:07
->>>>>>> tzuchen
+-- Dump completed on 2026-05-03 15:46:59
