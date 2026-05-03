@@ -768,52 +768,68 @@ window.addEventListener('resize', () => {
    ======================================================== */
 function enterCatEditMode(c) {
   state.editingCategoryId = c.categoryId;
+  state.editingIsSystem = !!c.isSystem;
 
-  if (c.categoryType !== state.type) {
-    state.type = c.categoryType;
-    document.querySelectorAll('.seg-btn').forEach(x =>
-      x.classList.toggle('active', x.dataset.type === state.type)
-    );
+  const nameInput = document.getElementById('catName');
+  const statusField = document.getElementById('catStatusField');
+  const disabledCheckbox = document.getElementById('catDisabled');
+
+  const editIcon = c.icon || '📦';
+  const editColor = c.color || getDefaultCategoryColor();
+
+  nameInput.value = c.categoryName || '';
+  document.getElementById('catIcon').value = editIcon;
+  document.getElementById('catColor').value = editColor;
+
+  if (state.editingIsSystem) {
+    nameInput.readOnly = true;
+    nameInput.classList.add('readonly-input');
+
+    disabledCheckbox.checked = false;
+    statusField.style.display = 'none';
+  } else {
+    nameInput.readOnly = false;
+    nameInput.classList.remove('readonly-input');
+
+    disabledCheckbox.checked = !!c.isDisable;
+    statusField.style.display = '';
   }
 
   applyCategoryMode('edit');
 
-  document.getElementById('catName').value = c.categoryName;
+  setIcon(editIcon);
+  setColor(editColor);
 
-  setIcon(c.icon || '📦');
-  setColor(c.color || getDefaultCategoryColor());
-
-  const statusField = document.getElementById('catStatusField');
-  if (statusField) {
-    statusField.style.display = '';
-  }
-
-  document.getElementById('catDisabled').checked = !!c.isDisable;
-
-  render();
+  renderTiles();
 }
 
 function resetCatForm() {
   state.editingCategoryId = null;
+  state.editingIsSystem = false;
 
-  document.getElementById('catForm').reset();
+  const nameInput = document.getElementById('catName');
+  const statusField = document.getElementById('catStatusField');
+  const disabledCheckbox = document.getElementById('catDisabled');
 
-  setIcon('📦');
-  setColor(getDefaultCategoryColor());
+  nameInput.value = '';
+  nameInput.readOnly = false;
+  nameInput.classList.remove('readonly-input');
+
+  disabledCheckbox.checked = false;
+  statusField.style.display = 'none';
+
+  const defaultIcon = '📦';
+  const defaultColor = getDefaultCategoryColor();
+
+  document.getElementById('catIcon').value = defaultIcon;
+  document.getElementById('catColor').value = defaultColor;
 
   applyCategoryMode('create');
 
-  const statusField = document.getElementById('catStatusField');
-  if (statusField) {
-    statusField.style.display = 'none';
-  }
+  setIcon(defaultIcon);
+  setColor(defaultColor);
 
-  const disabledInput = document.getElementById('catDisabled');
-  if (disabledInput) {
-    disabledInput.checked = false;
-  }
-
-  render();
+  renderTiles();
 }
 
 function getDefaultCategoryColor(type = state.type) {
@@ -924,16 +940,17 @@ async function init() {
     state.categories = await WalletPet.categoryApi.list({
       includeDisabled: true
     });
-  } catch (e) {
-    console.warn('尚未有登入資料故無使用者分類 (' + e.message + ')');
-    state.categories = [];
-  }
 
-  applyCategoryMode('create');
-  renderIconPicker();
-  renderColorPalette();
-  render();
+    applyCategoryMode('create');
+    renderIconPicker();
+    renderColorPalette();
+    render();
+
+  } catch (e) {
+    console.warn('[categories] 初始化失敗：', e.message);
+  }
 }
+init();
 init();
 </script>
 </body>

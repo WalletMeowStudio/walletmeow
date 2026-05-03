@@ -171,12 +171,10 @@ public class CategoryServiceImpl implements CategoryService {
     /*
      * 修改分類。
      *
-     * DTO 最小化後，不再使用 CategoryUpdateRequest。
-     *
      * 規則：
      * 1. 系統預設分類 isSystem = true：
-     *    不允許修改 categoryName / icon / color。
-     *    但允許停用或啟用。
+     *    不允許修改 categoryName / 停用或啟用。
+     *    但允許修改 icon / color。
      *
      * 2. 使用者自訂分類 isSystem = false：
      *    可修改 categoryName / icon / color / isDisable。
@@ -199,22 +197,56 @@ public class CategoryServiceImpl implements CategoryService {
 
         boolean isSystemCategory = Boolean.TRUE.equals(category.getIsSystem());
 
+        /*
+         * 系統預設分類：
+         * - 不可改名稱
+         * - 不可停用 / 啟用
+         * - 可改 icon / color
+         */
         if (isSystemCategory) {
-            boolean wantsToChangeBasicInfo =
-                    hasText(categoryName) || hasText(icon) || hasText(color);
 
-            if (wantsToChangeBasicInfo) {
-                throw new BusinessException("系統預設分類不可修改名稱、圖示或顏色");
+            // 若前端有傳 categoryName，只有「與原名稱相同」才允許忽略
+            if (categoryName != null) {
+                String normalizedCategoryName = categoryName.trim();
+
+                boolean wantsToChangeName =
+                        !normalizedCategoryName.equals(category.getCategoryName());
+
+                if (wantsToChangeName) {
+                    throw new BusinessException("系統預設分類不可修改名稱");
+                }
             }
 
+            // 若前端有傳 isDisable，只有「與原狀態相同」才允許忽略
             if (isDisable != null) {
-                category.setIsDisable(isDisable);
+                boolean currentDisable = Boolean.TRUE.equals(category.getIsDisable());
+
+                if (!isDisable.equals(currentDisable)) {
+                    throw new BusinessException("系統預設分類不可停用或啟用");
+                }
+            }
+
+            // 系統預設分類允許修改 icon
+            if (icon != null) {
+                category.setIcon(resolveIcon(icon));
+            }
+
+            // 系統預設分類允許修改 color
+            if (color != null) {
+                category.setColor(normalizeNullableText(color));
             }
 
             Category savedCategory = categoryRepository.save(category);
             return CategoryMapper.toResponse(savedCategory);
         }
 
+        /*
+         * 使用者自訂分類：
+         * - 可改名稱
+         * - 可改 icon
+         * - 可改 color
+         * - 可改 isDisable
+         */
         if (categoryName != null) {
             validateCategoryName(categoryName);
 

@@ -345,7 +345,52 @@ WalletPet.createPager = function (opts = {}) {
   };
 };
 
+/* =========================================================
+   AUTH GUARD — 非 login 頁必須登入
+   ========================================================= */
 
+/**
+ * 取得目前頁面名稱
+ * 例如：
+ * login.html -> login
+ * categories.html -> categories
+ * transactions.html -> transactions
+ */
+WalletPet.getCurrentPageName = function () {
+  const fileName = location.pathname.substring(location.pathname.lastIndexOf('/') + 1);
+
+  if (!fileName || fileName === '/') return 'dashboard';
+
+  return fileName.replace('.html', '');
+};
+
+WalletPet.isLoginPage = function () {
+  return WalletPet.getCurrentPageName() === 'login';
+};
+
+WalletPet.isLoggedIn = function () {
+  const token = WalletPet.api && WalletPet.api.getToken
+    ? WalletPet.api.getToken()
+    : localStorage.getItem('walletpet.jwt');
+
+  return !!token && token.trim() !== '';
+};
+
+WalletPet.requireLogin = function () {
+  if (WalletPet.isLoginPage()) return true;
+
+  if (!WalletPet.isLoggedIn()) {
+    localStorage.removeItem('walletpet.jwt');
+    localStorage.removeItem('walletpet.user');
+    localStorage.removeItem('walletpet.mood');
+    localStorage.removeItem('walletpet.cancan');
+
+    location.replace('login.html');
+    return false;
+  }
+
+  return true;
+};
 
 /* =========================================================
    LOGOUT — 清 JWT + user,回到 login 頁
@@ -362,6 +407,7 @@ WalletPet.logout = function () {
     // 2. 清 user 資訊 + mood 快取
     localStorage.removeItem('walletpet.user');
     localStorage.removeItem('walletpet.mood');
+    localStorage.removeItem('walletpet.cancan');
     // 3. (可選) 通知後端 — 如果後端有 /api/auth/logout endpoint 可解除 token
     //    目前後端分工文件沒規劃,先保留空殼以利未來啟用
     //    try { await WalletPet.api.post('/api/auth/logout'); } catch(e){}
@@ -589,15 +635,18 @@ WalletPet.updatePetStatus = function (pet) {
    9. AUTO-INIT on DOMContentLoaded
    ========================================================= */
 document.addEventListener('DOMContentLoaded', () => {
+  const allowed = WalletPet.requireLogin();
+  if (!allowed) return;
+
   WalletPet.renderHeader();
   WalletPet.renderTweaksPanel();
   WalletPet.initTweaks();
   WalletPet.initPageNav();
   WalletPet.refreshHeaderUser();
 
-  // 背景刷新:非 login 頁都嘗試拉最新 pet mood + cancan
-  // - 失敗不影響頁面 (localStorage 快取值仍會顯示)
-  // - pets 頁自己會 loadPet,這裡當作備援
+  // login 頁不要打寵物 API
+  if (WalletPet.isLoginPage()) return;
+
   const mc = document.getElementById('moodChip');
   if (mc && WalletPet.petApi && typeof WalletPet.petApi.me === 'function') {
     WalletPet.petApi.me()

@@ -1761,25 +1761,29 @@ document.getElementById('typeFilter').addEventListener('change', async () => {
 
 /* ---- 初始化 ---- */
 async function init() {
-  document.getElementById('txDate').value = fmt.today();
+  try{
+    document.getElementById('txDate').value = fmt.today();
 
-  applyTransactionMode(state.type, 'create');
+    applyTransactionMode(state.type, 'create');
 
-  await loadFormMeta();
-  await loadAccountOptions();
-  await loadCategoryOptions();
+    await loadFormMeta();
+    await loadAccountOptions();
+    await loadCategoryOptions();
 
-  // 先找最近一筆交易在哪個月份
-  await loadInitialTransactionMonth();
+    // 先找最近一筆交易在哪個月份
+    await loadInitialTransactionMonth();
 
-  // 再查該月份交易
-  await loadTransactions();
+    // 再查該月份交易
+    await loadTransactions();
 
-  await refreshPet();
-  await refreshPetEvents();
-  await refreshDailyReward(fmt.today());
+    await refreshPet();
+    await refreshPetEvents();
+    await refreshDailyReward(fmt.today());
 
-  renderDayDetail();
+    renderDayDetail();
+  } catch(e){
+    console.warn('[transactions] 初始化失敗：', e.message);
+  }
 }
 init();
 </script>
